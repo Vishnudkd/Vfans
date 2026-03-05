@@ -1,9 +1,13 @@
 import React from "react";
 import "@/App.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Toaster } from "./components/ui/sonner";
 
 // Pages
 import Home from "./pages/Home";
+import PricingPage from "./pages/PricingPage";
+import Contact from "./pages/Contact";
+import Support from "./pages/Support";
 import LegalCenter from "./pages/LegalCenter";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
@@ -20,6 +24,9 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/support" element={<Support />} />
           <Route path="/legal" element={<LegalCenter />} />
           <Route path="/privacy-policy" element={<PrivacyPolicy />} />
           <Route path="/terms-of-service" element={<TermsOfService />} />
@@ -31,6 +38,7 @@ function App() {
           <Route path="/content-provider-agreement" element={<ContentProviderAgreement />} />
         </Routes>
       </BrowserRouter>
+      <Toaster />
     </div>
   );
 }

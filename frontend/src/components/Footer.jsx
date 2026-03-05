@@ -6,13 +6,9 @@ const Footer = () => {
     {
       title: 'Sections',
       links: [
-        { name: 'How it works', href: '/#how-it-works' },
         { name: 'Contact us', href: '/contact' },
-        { name: 'Creators', href: '/#creators' },
-        { name: 'Pricing', href: '/#pricing' },
-        { name: 'Support', href: '/support' },
-        { name: 'Affiliates', href: '/affiliates' },
-        { name: 'FAQ', href: '/#faq' }
+        { name: 'Pricing', href: '/pricing' },
+        { name: 'Support', href: '/support' }
       ]
     },
     {

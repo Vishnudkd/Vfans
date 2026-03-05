@@ -1,20 +1,18 @@
 import React from 'react';
 import Header from '../components/Header';
-import Hero from '../components/Hero';
-import Benefits from '../components/Benefits';
 import Pricing from '../components/Pricing';
 import Footer from '../components/Footer';
 
-const Home = () => {
+const PricingPage = () => {
   return (
     <div className="min-h-screen bg-white">
       <Header />
-      <Hero />
-      <Benefits />
-      <Pricing />
+      <div className="pt-20">
+        <Pricing />
+      </div>
       <Footer />
     </div>
   );
 };
 
-export default Home;
+export default PricingPage;
