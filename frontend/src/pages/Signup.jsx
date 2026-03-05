@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Card } from '../components/ui/card';
@@ -8,13 +8,17 @@ import { Input } from '../components/ui/input';
 import { Checkbox } from '../components/ui/checkbox';
 import { Eye, EyeOff, CheckCircle2 } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
+import { useAuth } from '../contexts/AuthContext';
 
 const Signup = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { signup } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
+    fullName: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -77,20 +81,35 @@ const Signup = () => {
 
     setIsSubmitting(true);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const result = await signup(formData.email, formData.password, formData.fullName);
+      
+      if (result.success) {
+        toast({
+          title: "Account Created Successfully!",
+          description: "Welcome to VFans Media. Redirecting to your dashboard...",
+        });
+        
+        // Redirect to dashboard after successful signup
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1000);
+      } else {
+        toast({
+          title: "Signup Failed",
+          description: result.error,
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+      }
+    } catch (error) {
       toast({
-        title: "Account Created Successfully!",
-        description: "Welcome to VFans Media. You can now start selling your content.",
-      });
-      setFormData({
-        email: '',
-        password: '',
-        confirmPassword: '',
-        agreeToTerms: false
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
       });
       setIsSubmitting(false);
-    }, 1500);
+    }
   };
 
   const benefits = [
@@ -141,6 +160,21 @@ const Signup = () => {
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Create Your Account</h2>
               
               <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Full Name Field */}
+                <div>
+                  <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
+                    Full Name (Optional)
+                  </label>
+                  <Input
+                    id="fullName"
+                    name="fullName"
+                    type="text"
+                    value={formData.fullName}
+                    onChange={handleChange}
+                    placeholder="Your full name"
+                  />
+                </div>
+
                 {/* Email Field */}
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">

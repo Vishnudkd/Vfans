@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Card } from '../components/ui/card';
@@ -7,9 +7,12 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Eye, EyeOff } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
+import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -59,18 +62,35 @@ const Login = () => {
 
     setIsSubmitting(true);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const result = await login(formData.email, formData.password);
+      
+      if (result.success) {
+        toast({
+          title: "Login Successful!",
+          description: "Welcome back to VFans Media. Redirecting to your dashboard...",
+        });
+        
+        // Redirect to dashboard after successful login
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 1000);
+      } else {
+        toast({
+          title: "Login Failed",
+          description: result.error,
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+      }
+    } catch (error) {
       toast({
-        title: "Login Successful!",
-        description: "Welcome back to VFans Media.",
-      });
-      setFormData({
-        email: '',
-        password: ''
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
       });
       setIsSubmitting(false);
-    }, 1500);
+    }
   };
 
   return (
