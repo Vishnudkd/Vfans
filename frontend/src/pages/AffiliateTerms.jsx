@@ -128,9 +128,7 @@ const AffiliateTerms = () => {
                   For affiliate program questions, contact:<br /><br />
                   <strong>VFans Media LLC</strong><br />
                   Affiliate Program<br />
-                  30 N Gould St Ste R<br />
-                  Sheridan, WY 82801<br />
-                  Email: affiliates@vfansmedia.com
+                  Email: <a href="mailto:support@vfansmedia.com" className="text-black hover:underline">affiliates@vfansmedia.com</a>
                 </p>
               </div>
             </section>

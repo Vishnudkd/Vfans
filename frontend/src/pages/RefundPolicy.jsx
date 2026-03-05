@@ -110,9 +110,7 @@ const RefundPolicy = () => {
                 <p className="text-gray-700">
                   For refund requests or questions, contact:<br /><br />
                   <strong>VFans Media LLC</strong><br />
-                  30 N Gould St Ste R<br />
-                  Sheridan, WY 82801<br />
-                  Email: support@vfansmedia.com
+                  Email: <a href="mailto:support@vfansmedia.com" className="text-black hover:underline">support@vfansmedia.com</a>
                 </p>
               </div>
             </section>

@@ -170,9 +170,7 @@ const ContentProviderAgreement = () => {
                 <p className="text-gray-700">
                   <strong>VFans Media LLC</strong><br />
                   Creator Relations<br />
-                  30 N Gould St Ste R<br />
-                  Sheridan, WY 82801<br />
-                  Email: creators@vfansmedia.com
+                  Email: <a href="mailto:support@vfansmedia.com" className="text-black hover:underline">creators@vfansmedia.com</a>
                 </p>
               </div>
             </section>

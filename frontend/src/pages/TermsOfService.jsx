@@ -129,9 +129,7 @@ const TermsOfService = () => {
               <div className="bg-gray-50 p-6 rounded-lg mt-4">
                 <p className="text-gray-700">
                   <strong>VFans Media LLC</strong><br />
-                  30 N Gould St Ste R<br />
-                  Sheridan, WY 82801<br />
-                  Email: support@vfansmedia.com
+                  Email: <a href="mailto:support@vfansmedia.com" className="text-black hover:underline">support@vfansmedia.com</a>
                 </p>
               </div>
             </section>

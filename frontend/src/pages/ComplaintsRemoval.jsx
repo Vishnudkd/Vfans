@@ -156,14 +156,12 @@ const ComplaintsRemoval = () => {
                 <p className="text-gray-700">
                   <strong>VFans Media LLC</strong><br />
                   Complaints & Removal Department<br />
-                  30 N Gould St Ste R<br />
-                  Sheridan, WY 82801<br />
                   <br />
                   <strong>Email Contacts:</strong><br />
-                  General: support@vfansmedia.com<br />
-                  Abuse: abuse@vfansmedia.com<br />
-                  Legal: legal@vfansmedia.com<br />
-                  DMCA: dmca@vfansmedia.com
+                  General: <a href="mailto:support@vfansmedia.com" className="text-black hover:underline">support@vfansmedia.com</a><br />
+                  Abuse: <a href="mailto:abuse@vfansmedia.com" className="text-black hover:underline">abuse@vfansmedia.com</a><br />
+                  Legal: <a href="mailto:legal@vfansmedia.com" className="text-black hover:underline">legal@vfansmedia.com</a><br />
+                  DMCA: <a href="mailto:dmca@vfansmedia.com" className="text-black hover:underline">dmca@vfansmedia.com</a>
                 </p>
               </div>
             </section>

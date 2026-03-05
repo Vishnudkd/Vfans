@@ -72,9 +72,14 @@ const Footer = () => {
             <p className="text-gray-500 text-sm">
               © 2025. All rights reserved. VFans Media LLC
             </p>
-            <p className="text-gray-500 text-sm">
-              30 N Gould St Ste R, Sheridan, WY 82801
-            </p>
+            <div className="flex flex-col md:flex-row md:space-x-6 space-y-2 md:space-y-0 text-sm text-gray-500">
+              <a href="mailto:support@vfansmedia.com" className="hover:text-gray-900">
+                support@vfansmedia.com
+              </a>
+              <a href="mailto:dmca@vfansmedia.com" className="hover:text-gray-900">
+                dmca@vfansmedia.com
+              </a>
+            </div>
           </div>
         </div>
       </div>

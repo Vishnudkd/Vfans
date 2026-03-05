@@ -58,16 +58,20 @@ const Contact = () => {
               <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center mx-auto mb-4">
                 <Mail className="h-6 w-6 text-white" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Email</h3>
-              <p className="text-gray-600">support@vfansmedia.com</p>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Support Email</h3>
+              <a href="mailto:support@vfansmedia.com" className="text-gray-600 hover:text-gray-900">
+                support@vfansmedia.com
+              </a>
             </Card>
 
             <Card className="p-6 text-center border-2 border-gray-100 hover:border-gray-300 transition-all duration-300">
               <div className="w-12 h-12 bg-black rounded-full flex items-center justify-center mx-auto mb-4">
-                <MapPin className="h-6 w-6 text-white" />
+                <Mail className="h-6 w-6 text-white" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Address</h3>
-              <p className="text-gray-600">30 N Gould St Ste R<br />Sheridan, WY 82801</p>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">DMCA Email</h3>
+              <a href="mailto:dmca@vfansmedia.com" className="text-gray-600 hover:text-gray-900">
+                dmca@vfansmedia.com
+              </a>
             </Card>
 
             <Card className="p-6 text-center border-2 border-gray-100 hover:border-gray-300 transition-all duration-300">

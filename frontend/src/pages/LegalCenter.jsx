@@ -104,8 +104,8 @@ const LegalCenter = () => {
               If you have questions about our legal policies or need clarification on any terms, please don't hesitate to contact us.
             </p>
             <div className="space-y-2 text-gray-700">
-              <p><strong>Email:</strong> legal@vfansmedia.com</p>
-              <p><strong>Address:</strong> 30 N Gould St Ste R, Sheridan, WY 82801</p>
+              <p><strong>Support:</strong> <a href="mailto:support@vfansmedia.com" className="text-black hover:underline">support@vfansmedia.com</a></p>
+              <p><strong>DMCA:</strong> <a href="mailto:dmca@vfansmedia.com" className="text-black hover:underline">dmca@vfansmedia.com</a></p>
             </div>
           </div>
         </div>

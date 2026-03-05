@@ -41,9 +41,7 @@ const DMCATakedown = () => {
                   <strong>DMCA Agent:</strong><br />
                   VFans Media LLC<br />
                   Attn: Copyright Agent<br />
-                  30 N Gould St Ste R<br />
-                  Sheridan, WY 82801<br />
-                  Email: dmca@vfansmedia.com
+                  Email: <a href="mailto:dmca@vfansmedia.com" className="text-black hover:underline">dmca@vfansmedia.com</a>
                 </p>
               </div>
             </section>
