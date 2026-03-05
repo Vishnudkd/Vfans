@@ -76,4 +76,4 @@ All required pages are in place:
 - Additional legal pages for comprehensive compliance ✅
 
 ## Live Preview
-Access the live site at: https://vfans-landing.preview.emergentagent.com
+Access the live site at: https://vfans-build.preview.emergentagent.com

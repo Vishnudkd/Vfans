@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Test VFans Media signup and login navigation flows on https://vfans-landing.preview.emergentagent.com"
+user_problem_statement: "Test VFans Media signup and login navigation flows on https://vfans-build.preview.emergentagent.com"
 
 frontend:
   - task: "Homepage to Signup Navigation - Desktop"
@@ -172,7 +172,7 @@ metadata:
   test_sequence: 1
   run_ui: true
   tested_on: "2025-07-XX"
-  test_url: "https://vfans-landing.preview.emergentagent.com"
+  test_url: "https://vfans-build.preview.emergentagent.com"
 
 test_plan:
   current_focus:
