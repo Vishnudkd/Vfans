@@ -68,18 +68,10 @@ const Footer = () => {
         </div>
 
         <div className="mt-12 pt-8 border-t border-gray-200">
-          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+          <div className="text-center">
             <p className="text-gray-500 text-sm">
               © 2025. All rights reserved. VFans Media LLC
             </p>
-            <div className="flex flex-col md:flex-row md:space-x-6 space-y-2 md:space-y-0 text-sm text-gray-500">
-              <a href="mailto:support@vfansmedia.com" className="hover:text-gray-900">
-                support@vfansmedia.com
-              </a>
-              <a href="mailto:dmca@vfansmedia.com" className="hover:text-gray-900">
-                dmca@vfansmedia.com
-              </a>
-            </div>
           </div>
         </div>
       </div>
