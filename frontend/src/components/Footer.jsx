@@ -70,7 +70,7 @@ const Footer = () => {
         <div className="mt-12 pt-8 border-t border-gray-200">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             <p className="text-gray-500 text-sm">
-              © 2025. All rights reserved. VFans Media
+              © 2025. All rights reserved. VFans Media LLC
             </p>
             <p className="text-gray-500 text-sm">
               30 N Gould St Ste R, Sheridan, WY 82801
