@@ -74,11 +74,13 @@ const Header = () => {
                 {item.name}
               </a>
             ))}
-            <Button 
-              className="w-full bg-black hover:bg-gray-800 text-white rounded-full"
-            >
-              Get Started
-            </Button>
+            <Link to="/signup" onClick={() => setMobileMenuOpen(false)}>
+              <Button 
+                className="w-full bg-black hover:bg-gray-800 text-white rounded-full"
+              >
+                Get Started
+              </Button>
+            </Link>
           </div>
         )}
       </nav>
