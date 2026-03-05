@@ -39,6 +39,7 @@ const Header = () => {
             ))}
             <Button 
               className="bg-black hover:bg-gray-800 text-white rounded-full px-6"
+              onClick={() => window.location.href = '/signup'}
             >
               Get Started
             </Button>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { Check } from 'lucide-react';
@@ -47,12 +48,14 @@ const Pricing = () => {
             ))}
           </div>
 
-          <Button 
-            size="lg" 
-            className="w-full bg-black hover:bg-gray-800 text-white py-6 text-lg rounded-full transition-all duration-300 hover:scale-105 mb-8"
-          >
-            Get Started
-          </Button>
+          <Link to="/signup">
+            <Button 
+              size="lg" 
+              className="w-full bg-black hover:bg-gray-800 text-white py-6 text-lg rounded-full transition-all duration-300 hover:scale-105 mb-8"
+            >
+              Get Started
+            </Button>
+          </Link>
 
           <div className="text-center pt-8 border-t border-gray-200">
             <div className="flex justify-center items-center space-x-(-3) mb-4">

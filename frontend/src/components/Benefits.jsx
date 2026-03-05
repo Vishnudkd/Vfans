@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { Zap, Shield, Share2, CreditCard } from 'lucide-react';
 import { Button } from './ui/button';
 
@@ -63,12 +64,14 @@ const Benefits = () => {
         </div>
 
         <div className="text-center">
-          <Button 
-            size="lg" 
-            className="bg-black hover:bg-gray-800 text-white px-8 py-6 text-lg rounded-full transition-all duration-300 hover:scale-105"
-          >
-            Get Started
-          </Button>
+          <Link to="/signup">
+            <Button 
+              size="lg" 
+              className="bg-black hover:bg-gray-800 text-white px-8 py-6 text-lg rounded-full transition-all duration-300 hover:scale-105"
+            >
+              Get Started
+            </Button>
+          </Link>
         </div>
       </div>
     </section>

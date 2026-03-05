@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { Button } from './ui/button';
 
@@ -14,13 +15,15 @@ const Hero = () => {
             Upload photos, videos, courses, eBooks, movies, games and sell them securely through a single link!
           </p>
           <div className="flex justify-center pt-4">
-            <Button 
-              size="lg" 
-              className="bg-black hover:bg-gray-800 text-white px-8 py-6 text-lg rounded-full transition-all duration-300 hover:scale-105"
-            >
-              Get Started
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
+            <Link to="/signup">
+              <Button 
+                size="lg" 
+                className="bg-black hover:bg-gray-800 text-white px-8 py-6 text-lg rounded-full transition-all duration-300 hover:scale-105"
+              >
+                Get Started
+                <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
           </div>
         </div>
       </div>

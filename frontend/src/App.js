@@ -5,6 +5,7 @@ import { Toaster } from "./components/ui/sonner";
 
 // Pages
 import Home from "./pages/Home";
+import Signup from "./pages/Signup";
 import PricingPage from "./pages/PricingPage";
 import Contact from "./pages/Contact";
 import Support from "./pages/Support";
@@ -24,6 +25,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/signup" element={<Signup />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/support" element={<Support />} />
