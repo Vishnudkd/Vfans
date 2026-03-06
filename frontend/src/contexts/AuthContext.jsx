@@ -44,6 +44,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     loadUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const signup = async (email, password, fullName) => {
