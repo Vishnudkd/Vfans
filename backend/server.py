@@ -1,5 +1,6 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -15,10 +16,16 @@ import jwt
 import asyncio
 import resend
 import secrets
+import shutil
+from PIL import Image, ImageFilter
 
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
+
+# Create uploads directory
+UPLOAD_DIR = ROOT_DIR / 'uploads'
+UPLOAD_DIR.mkdir(exist_ok=True)
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -180,6 +187,98 @@ class WalletSummary(BaseModel):
     paid_out: float
     creators_earnings: List[dict]
 
+# Link Models
+class Link(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    organization_id: str
+    creator_id: str
+    title: str
+    description: Optional[str] = None
+    price: float
+    file_url: str  # Path to uploaded file
+    file_type: str  # image, video, audio, pdf
+    preview_url: Optional[str] = None  # Blurred preview
+    blur_level: str = "medium"  # blur, low, medium, high, extreme
+    short_link: str  # Custom slug
+    fee_applies_to: str = "seller"  # seller, split, buyer
+    single_purchase: bool = False
+    is_active: bool = True
+    views: int = 0
+    purchases: int = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class LinkCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    price: float
+    file_url: str
+    file_type: str
+    preview_url: Optional[str] = None
+    blur_level: str = "medium"
+    short_link: str
+    fee_applies_to: str = "seller"
+    single_purchase: bool = False
+
+class LinkResponse(BaseModel):
+    id: str
+    user_id: str
+    organization_id: str
+    creator_id: str
+    title: str
+    description: Optional[str] = None
+    price: float
+    file_url: str
+    file_type: str
+    preview_url: Optional[str] = None
+    blur_level: str
+    short_link: str
+    fee_applies_to: str
+    single_purchase: bool
+    is_active: bool
+    views: int
+    purchases: int
+    created_at: datetime
+
+# Customer Models
+class Customer(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    email: EmailStr
+    name: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class CustomerResponse(BaseModel):
+    id: str
+    email: str
+    name: Optional[str] = None
+    created_at: datetime
+
+# Purchase Models
+class Purchase(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    customer_id: str
+    link_id: str
+    creator_id: str
+    amount: float
+    stripe_session_id: str
+    status: str  # completed, pending, failed
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class PurchaseResponse(BaseModel):
+    id: str
+    customer_id: str
+    link_id: str
+    creator_id: str
+    amount: float
+    status: str
+    created_at: datetime
+
 # Utility Functions
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against a hash"""
@@ -318,6 +417,49 @@ def decode_access_token(token: str) -> dict:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials"
         )
+
+def generate_blur_preview(image_path: Path, output_path: Path, blur_level: str = "medium"):
+    """Generate blurred preview image"""
+    try:
+        # Blur level mapping
+        blur_radius_map = {
+            "blur": 5,
+            "low": 10,
+            "medium": 20,
+            "high": 30,
+            "extreme": 50
+        }
+        
+        blur_radius = blur_radius_map.get(blur_level, 20)
+        
+        # Open and blur image
+        img = Image.open(image_path)
+        
+        # Resize if too large (max 1920px width)
+        if img.width > 1920:
+            ratio = 1920 / img.width
+            new_size = (1920, int(img.height * ratio))
+            img = img.resize(new_size, Image.Resampling.LANCZOS)
+        
+        # Apply blur
+        blurred = img.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+        
+        # Save as JPEG
+        blurred.convert('RGB').save(output_path, 'JPEG', quality=85)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to generate blur preview: {str(e)}")
+        return False
+
+def save_upload_file(upload_file: UploadFile, destination: Path) -> bool:
+    """Save uploaded file to destination"""
+    try:
+        with destination.open("wb") as buffer:
+            shutil.copyfileobj(upload_file.file, buffer)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to save upload file: {str(e)}")
+        return False
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> User:
     """Get current user from JWT token"""
@@ -899,8 +1041,77 @@ async def get_wallet(current_user: User = Depends(get_current_user)):
         creators_earnings=creators_earnings
     )
 
+# File Upload Routes
+@api_router.post("/upload")
+async def upload_file(
+    file: UploadFile = File(...),
+    creator_id: str = None,
+    blur_level: str = "medium",
+    current_user: User = Depends(get_current_user)
+):
+    """Upload file and generate preview"""
+    # Validate file type
+    allowed_types = {
+        "image": ["image/jpeg", "image/png", "image/gif", "image/webp"],
+        "video": ["video/mp4", "video/quicktime", "video/x-msvideo"],
+        "audio": ["audio/mpeg", "audio/wav", "audio/ogg"],
+        "pdf": ["application/pdf"]
+    }
+    
+    file_type = None
+    for type_name, mime_types in allowed_types.items():
+        if file.content_type in mime_types:
+            file_type = type_name
+            break
+    
+    if not file_type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file type: {file.content_type}"
+        )
+    
+    # Create directory structure
+    file_id = str(uuid.uuid4())
+    user_dir = UPLOAD_DIR / current_user.id
+    if creator_id:
+        user_dir = user_dir / creator_id
+    user_dir = user_dir / file_id
+    user_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Get file extension
+    file_extension = Path(file.filename).suffix
+    file_path = user_dir / f"original{file_extension}"
+    
+    # Save file
+    if not save_upload_file(file, file_path):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to save file"
+        )
+    
+    # Generate preview for images
+    preview_url = None
+    if file_type == "image":
+        preview_path = user_dir / "preview_blurred.jpg"
+        if generate_blur_preview(file_path, preview_path, blur_level):
+            preview_url = f"/uploads/{current_user.id}/{creator_id or ''}/{file_id}/preview_blurred.jpg"
+    
+    file_url = f"/uploads/{current_user.id}/{creator_id or ''}/{file_id}/original{file_extension}"
+    
+    return {
+        "status": "success",
+        "file_id": file_id,
+        "file_url": file_url,
+        "file_type": file_type,
+        "preview_url": preview_url,
+        "blur_level": blur_level
+    }
+
 # Include the router in the main app
 app.include_router(api_router)
+
+# Mount uploads directory for serving files
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
