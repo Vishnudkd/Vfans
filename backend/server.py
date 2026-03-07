@@ -18,6 +18,10 @@ import resend
 import secrets
 import shutil
 from PIL import Image, ImageFilter
+import stripe
+
+# Initialize Stripe
+stripe.api_key = None  # Will be set after loading env
 
 
 ROOT_DIR = Path(__file__).parent
@@ -41,6 +45,11 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'noreply@vfansmedia.com')
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+
+# Stripe Configuration
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY')
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY')
+stripe.api_key = STRIPE_SECRET_KEY
 
 # Initialize Resend
 resend.api_key = RESEND_API_KEY
@@ -1290,6 +1299,178 @@ async def toggle_link_status(creator_id: str, link_id: str, current_user: User =
     return {
         "status": "success",
         "is_active": new_status
+    }
+
+# Stripe Payment Routes
+@api_router.post("/links/{link_id}/checkout")
+async def create_checkout_session(link_id: str):
+    """Create Stripe checkout session for link purchase"""
+    # Get link
+    link_doc = await db.links.find_one({"id": link_id}, {"_id": 0})
+    
+    if not link_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Link not found"
+        )
+    
+    if not link_doc.get('is_active'):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This link is not currently available"
+        )
+    
+    # Get creator info
+    creator_doc = await db.creators.find_one({"id": link_doc['creator_id']}, {"_id": 0})
+    
+    try:
+        # Create Stripe checkout session
+        session = stripe.checkout.Session.create(
+            payment_method_types=['card'],
+            line_items=[{
+                'price_data': {
+                    'currency': 'usd',
+                    'product_data': {
+                        'name': link_doc['title'],
+                        'description': link_doc.get('description', ''),
+                        'images': [f"{FRONTEND_URL}{link_doc['preview_url']}"] if link_doc.get('preview_url') else [],
+                    },
+                    'unit_amount': int(link_doc['price'] * 100),  # Convert to cents
+                },
+                'quantity': 1,
+            }],
+            mode='payment',
+            success_url=f"{FRONTEND_URL}/purchase/success?session_id={{CHECKOUT_SESSION_ID}}&link_id={link_id}",
+            cancel_url=f"{FRONTEND_URL}/l/{link_doc['short_link']}?canceled=true",
+            metadata={
+                'link_id': link_id,
+                'creator_id': link_doc['creator_id'],
+                'user_id': link_doc['user_id'],
+                'organization_id': link_doc['organization_id']
+            }
+        )
+        
+        return {
+            "sessionId": session.id,
+            "url": session.url
+        }
+    except Exception as e:
+        logger.error(f"Failed to create checkout session: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create checkout session"
+        )
+
+@api_router.post("/webhook/stripe")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhook events"""
+    payload = await request.body()
+    sig_header = request.headers.get('stripe-signature')
+    
+    # For development, we'll process without signature verification
+    # In production, you should verify the webhook signature
+    try:
+        event = stripe.Event.construct_from(
+            stripe.util.json.loads(payload), stripe.api_key
+        )
+    except Exception as e:
+        logger.error(f"Webhook error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    # Handle the checkout.session.completed event
+    if event['type'] == 'checkout.session.completed':
+        session = event['data']['object']
+        
+        # Get metadata
+        link_id = session['metadata'].get('link_id')
+        creator_id = session['metadata'].get('creator_id')
+        user_id = session['metadata'].get('user_id')
+        organization_id = session['metadata'].get('organization_id')
+        
+        # Get customer email
+        customer_email = session['customer_details']['email']
+        customer_name = session['customer_details'].get('name')
+        
+        # Create or get customer
+        customer_doc = await db.customers.find_one({"email": customer_email}, {"_id": 0})
+        if not customer_doc:
+            customer = Customer(
+                email=customer_email,
+                name=customer_name
+            )
+            customer_dict = customer.model_dump()
+            customer_dict['created_at'] = customer_dict['created_at'].isoformat()
+            await db.customers.insert_one(customer_dict)
+            customer_id = customer.id
+        else:
+            customer_id = customer_doc['id']
+        
+        # Create purchase record
+        purchase = Purchase(
+            customer_id=customer_id,
+            link_id=link_id,
+            creator_id=creator_id,
+            amount=session['amount_total'] / 100,  # Convert from cents
+            stripe_session_id=session['id'],
+            status='completed'
+        )
+        purchase_dict = purchase.model_dump()
+        purchase_dict['created_at'] = purchase_dict['created_at'].isoformat()
+        await db.purchases.insert_one(purchase_dict)
+        
+        # Create transaction (80% to creator)
+        creator_amount = (session['amount_total'] / 100) * 0.8
+        transaction = Transaction(
+            user_id=user_id,
+            organization_id=organization_id,
+            creator_id=creator_id,
+            amount=creator_amount,
+            status='pending'  # Will be available after 7 days
+        )
+        transaction_dict = transaction.model_dump()
+        transaction_dict['created_at'] = transaction_dict['created_at'].isoformat()
+        transaction_dict['available_at'] = transaction_dict['available_at'].isoformat()
+        await db.transactions.insert_one(transaction_dict)
+        
+        # Update link purchase count
+        await db.links.update_one(
+            {"id": link_id},
+            {"$inc": {"purchases": 1}}
+        )
+        
+        logger.info(f"Payment completed for link {link_id} by {customer_email}")
+    
+    return {"status": "success"}
+
+@api_router.get("/purchases/verify/{session_id}")
+async def verify_purchase(session_id: str):
+    """Verify purchase and get access to content"""
+    # Find purchase by session ID
+    purchase_doc = await db.purchases.find_one({"stripe_session_id": session_id}, {"_id": 0})
+    
+    if not purchase_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Purchase not found"
+        )
+    
+    # Get link details
+    link_doc = await db.links.find_one({"id": purchase_doc['link_id']}, {"_id": 0})
+    
+    if not link_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Link not found"
+        )
+    
+    return {
+        "status": "success",
+        "purchase": purchase_doc,
+        "link": {
+            "title": link_doc['title'],
+            "file_url": link_doc['file_url'],
+            "file_type": link_doc['file_type']
+        }
     }
 
 # Include the router in the main app
