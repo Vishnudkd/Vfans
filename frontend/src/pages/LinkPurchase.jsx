@@ -4,9 +4,6 @@ import axios from 'axios';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Lock, ShieldCheck, Zap, Download, Image as ImageIcon, Video, Music, FileText, Loader2 } from 'lucide-react';
-import { loadStripe } from '@stripe/stripe-js';
-
-const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 const FILE_TYPE_ICONS = {
   image: ImageIcon,
@@ -51,14 +48,8 @@ const LinkPurchase = () => {
     setError(null);
     try {
       const response = await axios.post(`${API_URL}/api/links/${link.id}/checkout`, { email });
-      const stripe = await stripePromise;
-      const { error: stripeError } = await stripe.redirectToCheckout({
-        sessionId: response.data.sessionId,
-      });
-      if (stripeError) {
-        setError(stripeError.message);
-        setPurchasing(false);
-      }
+      // Redirect to Stripe checkout URL directly
+      window.location.href = response.data.url;
     } catch (err) {
       setError('Failed to start checkout. Please try again.');
       setPurchasing(false);
