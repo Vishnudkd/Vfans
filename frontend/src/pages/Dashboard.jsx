@@ -181,7 +181,14 @@ const Dashboard = () => {
                 {expandedCreator === c.id && (
                   <div className="ml-6 space-y-0.5 pb-2">
                     <p className="px-4 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Links</p>
-                    <button className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded transition-colors">
+                    <button
+                      onClick={() => { navigate(`/creator/${c.id}/links`); setSidebarOpen(false); }}
+                      className={`w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition-colors ${
+                        window.location.pathname.includes('/links') && creatorId === c.id
+                          ? 'bg-gray-100 text-gray-900 font-medium'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
                       <LinkIcon className="h-4 w-4" />
                       <span>Links</span>
                     </button>
@@ -190,25 +197,55 @@ const Dashboard = () => {
                     <button
                       onClick={() => { navigate(`/creator/${c.id}/dashboard`); setSidebarOpen(false); }}
                       className={`w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition-colors ${
-                        creatorId === c.id ? 'bg-gray-100 text-gray-900 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                        window.location.pathname.includes('/dashboard') && creatorId === c.id
+                          ? 'bg-gray-100 text-gray-900 font-medium'
+                          : 'text-gray-700 hover:bg-gray-50'
                       }`}
                     >
                       <LayoutDashboard className="h-4 w-4" />
                       <span>Dashboard</span>
                     </button>
-                    <button className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded transition-colors">
+                    <button
+                      onClick={() => { navigate(`/creator/${c.id}/profile`); setSidebarOpen(false); }}
+                      className={`w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition-colors ${
+                        window.location.pathname.includes('/profile') && creatorId === c.id
+                          ? 'bg-gray-100 text-gray-900 font-medium'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
                       <User className="h-4 w-4" />
                       <span>Profile</span>
                     </button>
-                    <button className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded transition-colors">
+                    <button
+                      onClick={() => { navigate(`/creator/${c.id}/analytics`); setSidebarOpen(false); }}
+                      className={`w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition-colors ${
+                        window.location.pathname.includes('/analytics') && creatorId === c.id
+                          ? 'bg-gray-100 text-gray-900 font-medium'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
                       <TrendingUp className="h-4 w-4" />
                       <span>Analytics</span>
                     </button>
-                    <button className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded transition-colors">
+                    <button
+                      onClick={() => { navigate(`/creator/${c.id}/customers`); setSidebarOpen(false); }}
+                      className={`w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition-colors ${
+                        window.location.pathname.includes('/customers') && creatorId === c.id
+                          ? 'bg-gray-100 text-gray-900 font-medium'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
                       <ShoppingBag className="h-4 w-4" />
                       <span>Customers</span>
                     </button>
-                    <button className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded transition-colors">
+                    <button
+                      onClick={() => { navigate(`/creator/${c.id}/transactions`); setSidebarOpen(false); }}
+                      className={`w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition-colors ${
+                        window.location.pathname.includes('/transactions') && creatorId === c.id
+                          ? 'bg-gray-100 text-gray-900 font-medium'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
                       <CreditCard className="h-4 w-4" />
                       <span>Transactions</span>
                     </button>

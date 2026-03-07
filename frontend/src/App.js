@@ -13,6 +13,11 @@ import Dashboard from "./pages/Dashboard";
 import VerifyEmail from "./pages/VerifyEmail";
 import CreateOrganization from "./pages/CreateOrganization";
 import CreateCreator from "./pages/CreateCreator";
+import CreatorProfile from "./pages/CreatorProfile";
+import CreatorLinks from "./pages/CreatorLinks";
+import CreatorAnalytics from "./pages/CreatorAnalytics";
+import CreatorCustomers from "./pages/CreatorCustomers";
+import CreatorTransactions from "./pages/CreatorTransactions";
 import PricingPage from "./pages/PricingPage";
 import Contact from "./pages/Contact";
 import Support from "./pages/Support";
@@ -59,6 +64,46 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/creator/:creatorId/links" 
+              element={
+                <ProtectedRoute>
+                  <CreatorLinks />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/creator/:creatorId/profile" 
+              element={
+                <ProtectedRoute>
+                  <CreatorProfile />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/creator/:creatorId/analytics" 
+              element={
+                <ProtectedRoute>
+                  <CreatorAnalytics />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/creator/:creatorId/customers" 
+              element={
+                <ProtectedRoute>
+                  <CreatorCustomers />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/creator/:creatorId/transactions" 
+              element={
+                <ProtectedRoute>
+                  <CreatorTransactions />
                 </ProtectedRoute>
               } 
             />
