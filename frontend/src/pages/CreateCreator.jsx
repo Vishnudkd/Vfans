@@ -92,9 +92,9 @@ const CreateCreator = () => {
         description: `${formData.name} is ready to go.`,
       });
 
-      // Redirect to creators list or dashboard
+      // Redirect to the new creator's dashboard
       setTimeout(() => {
-        navigate('/creators');
+        navigate(`/creator/${response.data.id}/dashboard`);
       }, 1000);
     } catch (error) {
       toast({

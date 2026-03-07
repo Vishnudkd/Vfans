@@ -13,7 +13,6 @@ import Dashboard from "./pages/Dashboard";
 import VerifyEmail from "./pages/VerifyEmail";
 import CreateOrganization from "./pages/CreateOrganization";
 import CreateCreator from "./pages/CreateCreator";
-import CreatorsList from "./pages/CreatorsList";
 import PricingPage from "./pages/PricingPage";
 import Contact from "./pages/Contact";
 import Support from "./pages/Support";
@@ -40,14 +39,6 @@ function App() {
             
             {/* Protected Routes */}
             <Route 
-              path="/dashboard" 
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
               path="/create-organization" 
               element={
                 <ProtectedRoute>
@@ -60,14 +51,6 @@ function App() {
               element={
                 <ProtectedRoute>
                   <CreateCreator />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/creators" 
-              element={
-                <ProtectedRoute>
-                  <CreatorsList />
                 </ProtectedRoute>
               } 
             />
