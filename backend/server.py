@@ -1199,9 +1199,9 @@ async def get_creator_links(creator_id: str, current_user: User = Depends(get_cu
     
     return [LinkResponse(**link) for link in links]
 
-@api_router.get("/links/by-slug/{short_link}", response_model=LinkResponse)
+@api_router.get("/links/by-slug/{short_link}")
 async def get_link_by_slug(short_link: str):
-    """Get a specific link by short_link slug (public endpoint)"""
+    """Get a specific link by short_link slug (public endpoint) with creator info"""
     link_doc = await db.links.find_one({"short_link": short_link}, {"_id": 0})
     
     if not link_doc:
@@ -1220,7 +1220,25 @@ async def get_link_by_slug(short_link: str):
         {"$inc": {"views": 1}}
     )
     
-    return LinkResponse(**link_doc)
+    # Get creator info
+    creator_doc = await db.creators.find_one({"id": link_doc['creator_id']}, {"_id": 0})
+    creator_info = None
+    if creator_doc:
+        creator_info = {
+            "id": creator_doc['id'],
+            "name": creator_doc.get('name', 'Creator'),
+            "profile_picture": creator_doc.get('profile_picture'),
+            "bio": creator_doc.get('bio')
+        }
+    
+    link_response = LinkResponse(**link_doc)
+    result = link_response.model_dump()
+    result['creator_info'] = creator_info
+    # Serialize datetime
+    if isinstance(result.get('created_at'), datetime):
+        result['created_at'] = result['created_at'].isoformat()
+    
+    return result
 
 @api_router.get("/links/{link_id}", response_model=LinkResponse)
 async def get_link(link_id: str):
