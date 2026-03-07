@@ -7,6 +7,8 @@ from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
+import subprocess
+import re
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional
@@ -1112,6 +1114,44 @@ async def upload_file(
             detail="Failed to save file"
         )
     
+    # Strip metadata
+    if file_type == "image":
+        try:
+            img = Image.open(file_path)
+            clean = Image.new(img.mode, img.size)
+            clean.putdata(list(img.getdata()))
+            clean.save(file_path, quality=95)
+            img.close()
+            clean.close()
+        except Exception as e:
+            logger.warning(f"Could not strip image metadata: {e}")
+    elif file_type == "video":
+        try:
+            clean_path = file_path.parent / f"clean{file_extension}"
+            result = subprocess.run(
+                ["ffmpeg", "-y", "-i", str(file_path), "-map_metadata", "-1",
+                 "-c:v", "copy", "-c:a", "copy", str(clean_path)],
+                capture_output=True, timeout=120
+            )
+            if result.returncode == 0 and clean_path.exists():
+                file_path.unlink()
+                clean_path.rename(file_path)
+        except Exception as e:
+            logger.warning(f"Could not strip video metadata: {e}")
+    elif file_type == "audio":
+        try:
+            clean_path = file_path.parent / f"clean{file_extension}"
+            result = subprocess.run(
+                ["ffmpeg", "-y", "-i", str(file_path), "-map_metadata", "-1",
+                 "-c:a", "copy", str(clean_path)],
+                capture_output=True, timeout=60
+            )
+            if result.returncode == 0 and clean_path.exists():
+                file_path.unlink()
+                clean_path.rename(file_path)
+        except Exception as e:
+            logger.warning(f"Could not strip audio metadata: {e}")
+    
     # Build URL path segments
     path_parts = [current_user.id]
     if creator_id:
@@ -1174,6 +1214,18 @@ async def create_link(creator_id: str, link_data: LinkCreate, current_user: User
             detail="Short link already exists. Please choose a different one."
         )
     
+    # Rename files with link title
+    def sanitize_filename(title):
+        clean = re.sub(r'[^\w\s-]', '', title).strip()
+        return re.sub(r'[\s]+', '_', clean)
+    
+    safe_title = sanitize_filename(link_data.title)
+    renamed_files = []
+    for i, f in enumerate(link_data.files):
+        ext = Path(f.get('name', '')).suffix or '.jpg'
+        new_name = f"{safe_title}_{i+1}{ext}" if len(link_data.files) > 1 else f"{safe_title}{ext}"
+        renamed_files.append({**f, 'name': new_name})
+    
     # Create link
     link = Link(
         user_id=current_user.id,
@@ -1182,7 +1234,7 @@ async def create_link(creator_id: str, link_data: LinkCreate, current_user: User
         title=link_data.title,
         description=link_data.description,
         price=link_data.price,
-        files=link_data.files,
+        files=renamed_files,
         file_url=link_data.file_url,
         file_type=link_data.file_type,
         preview_url=link_data.preview_url,
