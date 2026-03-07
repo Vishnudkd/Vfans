@@ -1165,6 +1165,22 @@ async def upload_file(
         preview_path = user_dir / "preview_blurred.jpg"
         if generate_blur_preview(file_path, preview_path, blur_level):
             preview_url = f"/api/uploads/{path_base}/preview_blurred.jpg"
+    elif file_type == "video":
+        # Extract first frame with ffmpeg, then blur it
+        try:
+            frame_path = user_dir / "first_frame.jpg"
+            result = subprocess.run(
+                ["ffmpeg", "-y", "-i", str(file_path), "-vframes", "1",
+                 "-q:v", "2", str(frame_path)],
+                capture_output=True, timeout=30
+            )
+            if result.returncode == 0 and frame_path.exists():
+                preview_path = user_dir / "preview_blurred.jpg"
+                if generate_blur_preview(frame_path, preview_path, blur_level):
+                    preview_url = f"/api/uploads/{path_base}/preview_blurred.jpg"
+                frame_path.unlink(missing_ok=True)
+        except Exception as e:
+            logger.warning(f"Could not generate video preview: {e}")
     
     file_url = f"/api/uploads/{path_base}/original{file_extension}"
     
@@ -1445,17 +1461,20 @@ async def create_checkout_session(link_id: str):
     
     try:
         # Create Stripe checkout session
+        product_data = {
+            'name': link_doc['title'],
+            'images': [f"{FRONTEND_URL}{link_doc['preview_url']}"] if link_doc.get('preview_url') else [],
+        }
+        if link_doc.get('description'):
+            product_data['description'] = link_doc['description']
+        
         session = stripe.checkout.Session.create(
             payment_method_types=['card'],
             line_items=[{
                 'price_data': {
                     'currency': 'usd',
-                    'product_data': {
-                        'name': link_doc['title'],
-                        'description': link_doc.get('description', ''),
-                        'images': [f"{FRONTEND_URL}{link_doc['preview_url']}"] if link_doc.get('preview_url') else [],
-                    },
-                    'unit_amount': int(link_doc['price'] * 100),  # Convert to cents
+                    'product_data': product_data,
+                    'unit_amount': int(link_doc['price'] * 100),
                 },
                 'quantity': 1,
             }],
