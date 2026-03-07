@@ -1315,6 +1315,38 @@ async def get_link_by_slug(short_link: str):
         {"$inc": {"views": 1}}
     )
     
+    # Generate missing preview for video files on-the-fly
+    if not link_doc.get('preview_url') and link_doc.get('file_type') == 'video' and link_doc.get('file_url'):
+        try:
+            relative = link_doc['file_url'].replace('/api/uploads/', '')
+            video_path = UPLOAD_DIR / relative
+            if video_path.exists():
+                preview_path = video_path.parent / "preview_blurred.jpg"
+                if not preview_path.exists():
+                    frame_path = video_path.parent / "first_frame.jpg"
+                    result = subprocess.run(
+                        ["ffmpeg", "-y", "-i", str(video_path), "-vframes", "1", "-q:v", "2", str(frame_path)],
+                        capture_output=True, timeout=15
+                    )
+                    if result.returncode == 0 and frame_path.exists():
+                        generate_blur_preview(frame_path, preview_path, link_doc.get('blur_level', 'medium'))
+                        frame_path.unlink(missing_ok=True)
+                if preview_path.exists():
+                    path_base = str(video_path.parent.relative_to(UPLOAD_DIR))
+                    new_preview_url = f"/api/uploads/{path_base}/preview_blurred.jpg"
+                    link_doc['preview_url'] = new_preview_url
+                    # Also update files array and DB
+                    updated_files = link_doc.get('files', [])
+                    for f in updated_files:
+                        if f.get('type') == 'video' and not f.get('preview_url'):
+                            f['preview_url'] = new_preview_url
+                    await db.links.update_one(
+                        {"short_link": short_link},
+                        {"$set": {"preview_url": new_preview_url, "files": updated_files}}
+                    )
+        except Exception as e:
+            logger.warning(f"On-the-fly video preview generation failed: {e}")
+    
     # Get creator info
     creator_doc = await db.creators.find_one({"id": link_doc['creator_id']}, {"_id": 0})
     creator_info = None

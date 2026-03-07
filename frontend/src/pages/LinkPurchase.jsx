@@ -70,11 +70,22 @@ const LinkPurchase = () => {
   }
 
   const creatorInitial = creatorInfo?.name?.charAt(0)?.toUpperCase() || 'C';
-  const previewSrc = link?.preview_url ? `${API_URL}${link.preview_url}` : (link?.file_type === 'image' ? `${API_URL}${link.file_url}` : null);
   const files = link?.files || [];
   const imgCount = files.filter((f) => f.type === 'image').length || (link?.file_type === 'image' ? 1 : 0);
   const vidCount = files.filter((f) => f.type === 'video').length || (link?.file_type === 'video' ? 1 : 0);
   const totalSize = files.reduce((s, f) => s + (f.size || 0), 0);
+
+  // Resolve preview: link-level → files array → image fallback
+  const resolvePreview = () => {
+    if (link?.preview_url) return `${API_URL}${link.preview_url}`;
+    const fileWithPreview = files.find((f) => f.preview_url);
+    if (fileWithPreview) return `${API_URL}${fileWithPreview.preview_url}`;
+    const imageFile = files.find((f) => f.type === 'image');
+    if (imageFile) return `${API_URL}${imageFile.url}`;
+    if (link?.file_type === 'image' && link?.file_url) return `${API_URL}${link.file_url}`;
+    return null;
+  };
+  const previewSrc = resolvePreview();
 
   return (
     <>
