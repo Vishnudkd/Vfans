@@ -6,6 +6,7 @@ import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { ArrowLeft, Search, Link as LinkIcon, Eye, DollarSign, Video, Music, FileText, ShoppingCart, Copy, ExternalLink } from 'lucide-react';
+import { toast } from 'sonner';
 
 const CreatorLinks = () => {
   const { token } = useAuth();
@@ -58,7 +59,11 @@ const CreatorLinks = () => {
 
   const handleCopyLink = (shortLink) => {
     const publicUrl = `${window.location.origin}/l/${shortLink}`;
-    navigator.clipboard.writeText(publicUrl);
+    navigator.clipboard.writeText(publicUrl).then(() => {
+      toast.success('Public link copied to clipboard!');
+    }).catch(() => {
+      toast.error('Failed to copy link');
+    });
   };
 
   const handleToggleStatus = async (linkId) => {

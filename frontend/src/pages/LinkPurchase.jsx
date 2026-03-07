@@ -8,13 +8,6 @@ import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
-const FILE_TYPE_LABELS = {
-  image: 'image',
-  video: 'video',
-  audio: 'audio',
-  pdf: 'document',
-};
-
 const FILE_TYPE_ICONS = {
   image: ImageIcon,
   video: Video,
@@ -98,9 +91,16 @@ const LinkPurchase = () => {
   }
 
   const FileIcon = FILE_TYPE_ICONS[link?.file_type] || ImageIcon;
-  const fileLabel = FILE_TYPE_LABELS[link?.file_type] || 'file';
   const creatorInitial = creatorInfo?.name?.charAt(0)?.toUpperCase() || 'C';
   const previewSrc = link?.preview_url ? `${API_URL}${link.preview_url}` : (link?.file_type === 'image' ? `${API_URL}${link.file_url}` : null);
+
+  // Build file count tags from files array
+  const files = link?.files || [];
+  const imgCount = files.filter((f) => f.type === 'image').length || (link?.file_type === 'image' ? 1 : 0);
+  const vidCount = files.filter((f) => f.type === 'video').length || (link?.file_type === 'video' ? 1 : 0);
+  const audioCount = files.filter((f) => f.type === 'audio').length || (link?.file_type === 'audio' ? 1 : 0);
+  const pdfCount = files.filter((f) => f.type === 'pdf').length || (link?.file_type === 'pdf' ? 1 : 0);
+  const totalSize = files.reduce((s, f) => s + (f.size || 0), 0);
 
   return (
     <div className="min-h-screen bg-gray-50" data-testid="link-purchase-page">
@@ -160,11 +160,37 @@ const LinkPurchase = () => {
           <h1 className="text-lg font-bold text-gray-900 mb-3" data-testid="link-title">{link?.title}</h1>
 
           {/* File Info Tags */}
-          <div className="flex items-center gap-2 mb-4">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-full text-xs text-gray-600">
-              <FileIcon className="w-3.5 h-3.5" />
-              1 {fileLabel}
-            </span>
+          <div className="flex items-center gap-2 flex-wrap mb-4">
+            {imgCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-full text-xs text-gray-600">
+                <ImageIcon className="w-3.5 h-3.5" />
+                {imgCount} image{imgCount > 1 ? 's' : ''}
+              </span>
+            )}
+            {vidCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-full text-xs text-gray-600">
+                <Video className="w-3.5 h-3.5" />
+                {vidCount} video{vidCount > 1 ? 's' : ''}
+              </span>
+            )}
+            {audioCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-full text-xs text-gray-600">
+                <Music className="w-3.5 h-3.5" />
+                {audioCount} audio
+              </span>
+            )}
+            {pdfCount > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-full text-xs text-gray-600">
+                <FileText className="w-3.5 h-3.5" />
+                {pdfCount} document{pdfCount > 1 ? 's' : ''}
+              </span>
+            )}
+            {totalSize > 0 && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-full text-xs text-gray-600">
+                <Download className="w-3.5 h-3.5" />
+                {totalSize < 1048576 ? `${(totalSize / 1024).toFixed(1)} KB` : `${(totalSize / 1048576).toFixed(1)} MB`}
+              </span>
+            )}
           </div>
 
           {link?.description && (

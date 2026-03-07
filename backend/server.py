@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Form, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
@@ -207,9 +207,10 @@ class Link(BaseModel):
     title: str
     description: Optional[str] = None
     price: float
-    file_url: str  # Path to uploaded file
-    file_type: str  # image, video, audio, pdf
-    preview_url: Optional[str] = None  # Blurred preview
+    files: List[dict] = []  # [{url, type, preview_url, name, size}]
+    file_url: str = ""  # Primary file (backward compat)
+    file_type: str = "image"  # Primary type
+    preview_url: Optional[str] = None  # Primary blurred preview
     blur_level: str = "medium"  # blur, low, medium, high, extreme
     short_link: str  # Custom slug
     fee_applies_to: str = "seller"  # seller, split, buyer
@@ -223,8 +224,9 @@ class LinkCreate(BaseModel):
     title: str
     description: Optional[str] = None
     price: float
-    file_url: str
-    file_type: str
+    files: List[dict] = []  # [{url, type, preview_url, name, size}]
+    file_url: str = ""
+    file_type: str = "image"
     preview_url: Optional[str] = None
     blur_level: str = "medium"
     short_link: str
@@ -239,8 +241,9 @@ class LinkResponse(BaseModel):
     title: str
     description: Optional[str] = None
     price: float
-    file_url: str
-    file_type: str
+    files: List[dict] = []
+    file_url: str = ""
+    file_type: str = "image"
     preview_url: Optional[str] = None
     blur_level: str
     short_link: str
@@ -1054,8 +1057,8 @@ async def get_wallet(current_user: User = Depends(get_current_user)):
 @api_router.post("/upload")
 async def upload_file(
     file: UploadFile = File(...),
-    creator_id: str = None,
-    blur_level: str = "medium",
+    creator_id: str = Form(None),
+    blur_level: str = Form("medium"),
     current_user: User = Depends(get_current_user)
 ):
     """Upload file and generate preview"""
@@ -1098,14 +1101,24 @@ async def upload_file(
             detail="Failed to save file"
         )
     
+    # Build URL path segments
+    path_parts = [current_user.id]
+    if creator_id:
+        path_parts.append(creator_id)
+    path_parts.append(file_id)
+    path_base = "/".join(path_parts)
+    
     # Generate preview for images
     preview_url = None
     if file_type == "image":
         preview_path = user_dir / "preview_blurred.jpg"
         if generate_blur_preview(file_path, preview_path, blur_level):
-            preview_url = f"/uploads/{current_user.id}/{creator_id or ''}/{file_id}/preview_blurred.jpg"
+            preview_url = f"/api/uploads/{path_base}/preview_blurred.jpg"
     
-    file_url = f"/uploads/{current_user.id}/{creator_id or ''}/{file_id}/original{file_extension}"
+    file_url = f"/api/uploads/{path_base}/original{file_extension}"
+    
+    # Get file size
+    file_size = file_path.stat().st_size
     
     return {
         "status": "success",
@@ -1113,7 +1126,9 @@ async def upload_file(
         "file_url": file_url,
         "file_type": file_type,
         "preview_url": preview_url,
-        "blur_level": blur_level
+        "blur_level": blur_level,
+        "file_name": file.filename,
+        "file_size": file_size
     }
 
 # Link Management Routes
@@ -1156,6 +1171,7 @@ async def create_link(creator_id: str, link_data: LinkCreate, current_user: User
         title=link_data.title,
         description=link_data.description,
         price=link_data.price,
+        files=link_data.files,
         file_url=link_data.file_url,
         file_type=link_data.file_type,
         preview_url=link_data.preview_url,
@@ -1517,8 +1533,8 @@ async def verify_purchase(session_id: str):
 # Include the router in the main app
 app.include_router(api_router)
 
-# Mount uploads directory for serving files
-app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+# Mount uploads directory for serving files (must be under /api for ingress routing)
+app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 app.add_middleware(
     CORSMiddleware,
