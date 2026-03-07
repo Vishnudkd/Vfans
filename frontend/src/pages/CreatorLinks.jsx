@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
-import { ArrowLeft, Search, Link as LinkIcon, Eye, DollarSign } from 'lucide-react';
+import { ArrowLeft, Search, Link as LinkIcon, Eye, DollarSign, Video, Music, FileText, ShoppingCart } from 'lucide-react';
 
 const CreatorLinks = () => {
   const { token } = useAuth();
@@ -15,16 +15,92 @@ const CreatorLinks = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterOption, setFilterOption] = useState('all'); // all links
   const [sortOption, setSortOption] = useState('newest');
+  const [links, setLinks] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
-  // Placeholder data - will be replaced with actual API calls
-  const links = [];
+  useEffect(() => {
+    const fetchLinks = async () => {
+      try {
+        const response = await axios.get(`${API_URL}/api/creators/${creatorId}/links`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setLinks(response.data);
+      } catch (error) {
+        console.error('Failed to fetch links:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLinks();
+  }, [creatorId, token, API_URL]);
+
+  // Filter links based on active tab
+  const filteredLinks = links.filter(link => {
+    if (activeTab === 'active') return link.is_active;
+    if (activeTab === 'inactive') return !link.is_active;
+    return true;
+  }).filter(link => {
+    if (searchQuery) {
+      return link.title.toLowerCase().includes(searchQuery.toLowerCase());
+    }
+    return true;
+  });
+
+  // Calculate stats
   const stats = {
-    totalLinks: 0,
-    totalViews: 0,
-    totalEarned: 0
+    totalLinks: links.length,
+    totalViews: links.reduce((sum, link) => sum + (link.views || 0), 0),
+    totalEarned: links.reduce((sum, link) => sum + (link.purchases || 0) * link.price, 0)
   };
+
+  const handleToggleStatus = async (linkId) => {
+    try {
+      await axios.patch(
+        `${API_URL}/api/creators/${creatorId}/links/${linkId}/toggle`,
+        {},
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      // Refresh links
+      const response = await axios.get(`${API_URL}/api/creators/${creatorId}/links`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setLinks(response.data);
+    } catch (error) {
+      console.error('Failed to toggle link status:', error);
+    }
+  };
+
+  const handleDeleteLink = async (linkId) => {
+    if (!window.confirm('Are you sure you want to delete this link?')) return;
+    
+    try {
+      await axios.delete(
+        `${API_URL}/api/creators/${creatorId}/links/${linkId}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      // Refresh links
+      const response = await axios.get(`${API_URL}/api/creators/${creatorId}/links`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      setLinks(response.data);
+    } catch (error) {
+      console.error('Failed to delete link:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading links...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -146,23 +222,104 @@ const CreatorLinks = () => {
           </Button>
         </div>
 
-        {/* Empty State */}
-        <Card className="p-12 bg-white rounded-2xl border border-gray-200">
-          <div className="text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
-              <LinkIcon className="h-8 w-8 text-gray-400" />
+        {/* Empty State or Links List */}
+        {filteredLinks.length === 0 ? (
+          <Card className="p-12 bg-white rounded-2xl border border-gray-200">
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 mb-4">
+                <LinkIcon className="h-8 w-8 text-gray-400" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">No active links</h3>
+              <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                You don't have any active links. Create a new one or reactivate an existing link.
+              </p>
+              <Button 
+                className="bg-green-600 hover:bg-green-700 text-white rounded-full px-8"
+                onClick={() => navigate(`/creator/${creatorId}/links/create`)}
+              >
+                Create link
+              </Button>
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">No active links</h3>
-            <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              You don't have any active links. Create a new one or reactivate an existing link.
-            </p>
-            <Button className="bg-green-600 hover:bg-green-700 text-white rounded-full px-8"
-              onClick={() => navigate(`/creator/${creatorId}/links/create`)}
-            >
-              Create link
-            </Button>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {filteredLinks.map((link) => (
+              <Card key={link.id} className="p-6 bg-white rounded-2xl border border-gray-200 hover:shadow-lg transition-shadow">
+                <div className="flex items-center gap-4">
+                  {/* Preview Image */}
+                  <div className="w-24 h-24 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+                    {link.preview_url || link.file_type === 'image' ? (
+                      <img
+                        src={`${API_URL}${link.preview_url || link.file_url}`}
+                        alt={link.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        {link.file_type === 'video' && <Video className="h-8 w-8" />}
+                        {link.file_type === 'audio' && <Music className="h-8 w-8" />}
+                        {link.file_type === 'pdf' && <FileText className="h-8 w-8" />}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Link Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-900 truncate">{link.title}</h3>
+                        <p className="text-sm text-gray-500 truncate">/{link.short_link}</p>
+                      </div>
+                      <div className="flex items-center gap-2 ml-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          link.is_active 
+                            ? 'bg-green-100 text-green-700' 
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {link.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-6 text-sm text-gray-600">
+                      <div className="flex items-center gap-1">
+                        <Eye className="h-4 w-4" />
+                        <span>{link.views} views</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <DollarSign className="h-4 w-4" />
+                        <span>${link.price.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <ShoppingCart className="h-4 w-4" />
+                        <span>{link.purchases} sales</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleToggleStatus(link.id)}
+                    >
+                      {link.is_active ? 'Deactivate' : 'Activate'}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteLink(link.id)}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            ))}
           </div>
-        </Card>
+        )}
       </main>
     </div>
   );

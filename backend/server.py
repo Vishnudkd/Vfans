@@ -1107,6 +1107,191 @@ async def upload_file(
         "blur_level": blur_level
     }
 
+# Link Management Routes
+@api_router.post("/creators/{creator_id}/links", response_model=LinkResponse, status_code=status.HTTP_201_CREATED)
+async def create_link(creator_id: str, link_data: LinkCreate, current_user: User = Depends(get_current_user)):
+    """Create a new link for creator"""
+    # Verify creator exists and belongs to user
+    creator_doc = await db.creators.find_one({
+        "id": creator_id,
+        "user_id": current_user.id
+    }, {"_id": 0})
+    
+    if not creator_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Creator not found"
+        )
+    
+    # Get organization
+    org_doc = await db.organizations.find_one({"user_id": current_user.id}, {"_id": 0})
+    if not org_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization not found"
+        )
+    
+    # Check if short_link is unique
+    existing_link = await db.links.find_one({"short_link": link_data.short_link})
+    if existing_link:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Short link already exists. Please choose a different one."
+        )
+    
+    # Create link
+    link = Link(
+        user_id=current_user.id,
+        organization_id=org_doc['id'],
+        creator_id=creator_id,
+        title=link_data.title,
+        description=link_data.description,
+        price=link_data.price,
+        file_url=link_data.file_url,
+        file_type=link_data.file_type,
+        preview_url=link_data.preview_url,
+        blur_level=link_data.blur_level,
+        short_link=link_data.short_link,
+        fee_applies_to=link_data.fee_applies_to,
+        single_purchase=link_data.single_purchase
+    )
+    
+    # Convert to dict and serialize datetime
+    link_doc = link.model_dump()
+    link_doc['created_at'] = link_doc['created_at'].isoformat()
+    
+    # Insert into database
+    await db.links.insert_one(link_doc)
+    
+    return LinkResponse(**link.model_dump())
+
+@api_router.get("/creators/{creator_id}/links", response_model=List[LinkResponse])
+async def get_creator_links(creator_id: str, current_user: User = Depends(get_current_user)):
+    """Get all links for a creator"""
+    # Verify creator belongs to user
+    creator_doc = await db.creators.find_one({
+        "id": creator_id,
+        "user_id": current_user.id
+    })
+    
+    if not creator_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Creator not found"
+        )
+    
+    # Get all links for this creator
+    links = await db.links.find({"creator_id": creator_id}, {"_id": 0}).to_list(1000)
+    
+    # Convert ISO string timestamps back to datetime
+    for link in links:
+        if isinstance(link.get('created_at'), str):
+            link['created_at'] = datetime.fromisoformat(link['created_at'])
+    
+    return [LinkResponse(**link) for link in links]
+
+@api_router.get("/links/{link_id}", response_model=LinkResponse)
+async def get_link(link_id: str):
+    """Get a specific link by ID (public endpoint)"""
+    link_doc = await db.links.find_one({"id": link_id}, {"_id": 0})
+    
+    if not link_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Link not found"
+        )
+    
+    # Convert ISO string timestamps back to datetime
+    if isinstance(link_doc.get('created_at'), str):
+        link_doc['created_at'] = datetime.fromisoformat(link_doc['created_at'])
+    
+    # Increment view count
+    await db.links.update_one(
+        {"id": link_id},
+        {"$inc": {"views": 1}}
+    )
+    
+    return LinkResponse(**link_doc)
+
+@api_router.put("/creators/{creator_id}/links/{link_id}", response_model=LinkResponse)
+async def update_link(creator_id: str, link_id: str, link_data: LinkCreate, current_user: User = Depends(get_current_user)):
+    """Update a link"""
+    # Verify link exists and belongs to user
+    link_doc = await db.links.find_one({
+        "id": link_id,
+        "creator_id": creator_id,
+        "user_id": current_user.id
+    })
+    
+    if not link_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Link not found"
+        )
+    
+    # Update link
+    update_data = link_data.model_dump()
+    await db.links.update_one(
+        {"id": link_id},
+        {"$set": update_data}
+    )
+    
+    # Get updated link
+    updated_link = await db.links.find_one({"id": link_id}, {"_id": 0})
+    
+    # Convert ISO string timestamps back to datetime
+    if isinstance(updated_link.get('created_at'), str):
+        updated_link['created_at'] = datetime.fromisoformat(updated_link['created_at'])
+    
+    return LinkResponse(**updated_link)
+
+@api_router.delete("/creators/{creator_id}/links/{link_id}")
+async def delete_link(creator_id: str, link_id: str, current_user: User = Depends(get_current_user)):
+    """Delete a link"""
+    result = await db.links.delete_one({
+        "id": link_id,
+        "creator_id": creator_id,
+        "user_id": current_user.id
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Link not found"
+        )
+    
+    return {
+        "status": "success",
+        "message": "Link deleted successfully"
+    }
+
+@api_router.patch("/creators/{creator_id}/links/{link_id}/toggle")
+async def toggle_link_status(creator_id: str, link_id: str, current_user: User = Depends(get_current_user)):
+    """Toggle link active status"""
+    link_doc = await db.links.find_one({
+        "id": link_id,
+        "creator_id": creator_id,
+        "user_id": current_user.id
+    })
+    
+    if not link_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Link not found"
+        )
+    
+    # Toggle is_active
+    new_status = not link_doc.get('is_active', True)
+    await db.links.update_one(
+        {"id": link_id},
+        {"$set": {"is_active": new_status}}
+    )
+    
+    return {
+        "status": "success",
+        "is_active": new_status
+    }
+
 # Include the router in the main app
 app.include_router(api_router)
 
