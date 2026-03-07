@@ -43,7 +43,8 @@ const CreateOrganization = () => {
     setIsSubmitting(true);
 
     try {
-      const response = await axios.post(
+      // Step 1: Create organization
+      const orgResponse = await axios.post(
         `${API_URL}/api/organizations`,
         formData,
         {
@@ -54,18 +55,35 @@ const CreateOrganization = () => {
         }
       );
 
+      // Step 2: Auto-create a default creator with the organization name
+      const creatorResponse = await axios.post(
+        `${API_URL}/api/creators`,
+        {
+          organization_id: orgResponse.data.id,
+          name: formData.name, // Use organization name as default creator name
+          profile_picture: formData.logo_url, // Use org logo as creator picture
+          bio: `Official ${formData.name} account`
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
       toast({
-        title: "Organization Created! 🎉",
-        description: `${formData.name} has been set up successfully.`,
+        title: "Welcome to VFans Media! 🎉",
+        description: `${formData.name} is ready to go. Redirecting to your dashboard...`,
       });
 
-      // Redirect to create creator page
+      // Step 3: Redirect to the creator's dashboard
       setTimeout(() => {
-        navigate('/create-creator');
+        navigate(`/creator/${creatorResponse.data.id}/dashboard`);
       }, 1000);
     } catch (error) {
       toast({
-        title: "Failed to Create Organization",
+        title: "Failed to Set Up Account",
         description: error.response?.data?.detail || "Please try again.",
         variant: "destructive",
       });
@@ -86,10 +104,6 @@ const CreateOrganization = () => {
             <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-300 text-gray-600 font-bold">
               2
             </div>
-            <div className="w-16 h-1 bg-gray-300 mx-2"></div>
-            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-300 text-gray-600 font-bold">
-              3
-            </div>
           </div>
         </div>
 
@@ -99,10 +113,10 @@ const CreateOrganization = () => {
             <Building2 className="h-8 w-8" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Create Your Organization
+            What's your creator name?
           </h1>
           <p className="text-gray-600">
-            Set up your brand or company to manage multiple creator profiles
+            This will be your brand name on VFans Media
           </p>
         </div>
 
@@ -111,7 +125,7 @@ const CreateOrganization = () => {
           {/* Organization Name */}
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-              Organization Name *
+              Creator Name *
             </label>
             <Input
               id="name"
@@ -123,14 +137,14 @@ const CreateOrganization = () => {
               className="text-lg py-6"
             />
             <p className="text-sm text-gray-500 mt-2">
-              This will be the main name for your brand or company
+              This will be your main identity on VFans Media
             </p>
           </div>
 
           {/* Logo URL (Optional) */}
           <div>
             <label htmlFor="logo_url" className="block text-sm font-medium text-gray-700 mb-2">
-              Logo URL (Optional)
+              Profile Picture URL (Optional)
             </label>
             <div className="relative">
               <Input
@@ -139,13 +153,13 @@ const CreateOrganization = () => {
                 type="url"
                 value={formData.logo_url}
                 onChange={handleChange}
-                placeholder="https://example.com/logo.png"
+                placeholder="https://example.com/profile.png"
                 className="text-lg py-6"
               />
               <Upload className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
             </div>
             <p className="text-sm text-gray-500 mt-2">
-              Add a direct link to your logo image. You can skip this for now and add it later.
+              Add a direct link to your profile picture. You can skip this for now and add it later.
             </p>
           </div>
 
@@ -198,19 +212,19 @@ const CreateOrganization = () => {
 
         {/* Benefits */}
         <div className="mt-8 pt-6 border-t border-gray-200">
-          <p className="text-sm font-medium text-gray-700 mb-3">What you can do with an organization:</p>
+          <p className="text-sm font-medium text-gray-700 mb-3">What happens next:</p>
           <ul className="space-y-2">
             <li className="flex items-start text-sm text-gray-600">
               <span className="text-green-500 mr-2">✓</span>
-              Create unlimited creator profiles
+              Your account will be created instantly
             </li>
             <li className="flex items-start text-sm text-gray-600">
               <span className="text-green-500 mr-2">✓</span>
-              Manage all profiles from one dashboard
+              You'll be taken to your dashboard
             </li>
             <li className="flex items-start text-sm text-gray-600">
               <span className="text-green-500 mr-2">✓</span>
-              Track analytics and earnings for each creator
+              Start creating links and earning money right away
             </li>
           </ul>
         </div>
