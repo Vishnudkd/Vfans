@@ -38,7 +38,9 @@ const Dashboard = () => {
   const [expandedCreator, setExpandedCreator] = useState(creatorId || null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+  const [stats, setStats] = useState(null);
+
+  const API_URL = process.env.REACT_APP_BACKEND_URL;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -67,6 +69,16 @@ const Dashboard = () => {
         setOrganization(orgResponse.data);
 
         setExpandedCreator(creatorId);
+
+        // Fetch stats
+        try {
+          const statsRes = await axios.get(`${API_URL}/api/creators/${creatorId}/stats`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          setStats(statsRes.data);
+        } catch (e) {
+          console.error('Failed to load stats');
+        }
       } catch (error) {
         toast({
           title: "Failed to load data",
@@ -304,53 +316,37 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto p-4 space-y-4">
-        {/* Page Title */}
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
         </div>
 
         {/* Stats Cards */}
-        <Card className="p-6 bg-white rounded-2xl border border-gray-200">
+        <Card className="p-6 bg-white rounded-2xl border border-gray-200" data-testid="stat-earnings">
           <div className="flex items-center space-x-2 mb-4">
             <DollarSign className="h-5 w-5 text-gray-700" />
-            <h3 className="font-semibold text-gray-700">Total Sales</h3>
+            <h3 className="font-semibold text-gray-700">Total Earnings</h3>
           </div>
-          <p className="text-3xl font-bold text-gray-900 mb-2">$0.00 <span className="text-lg text-gray-500">($0.00 gross)</span></p>
-          <p className="text-sm text-gray-600">Available: $0.00 | Pending: $0.00</p>
+          <p className="text-3xl font-bold text-gray-900 mb-2">${stats?.total_earned?.toFixed(2) || '0.00'}</p>
         </Card>
 
-        <Card className="p-6 bg-white rounded-2xl border border-gray-200">
-          <div className="flex items-center space-x-2 mb-4">
-            <LinkIcon className="h-5 w-5 text-gray-700" />
-            <h3 className="font-semibold text-gray-700">Links sold</h3>
-          </div>
-          <p className="text-3xl font-bold text-gray-900">0 <span className="text-lg text-gray-500">(based on 0 links)</span></p>
-        </Card>
-
-        <Card className="p-6 bg-white rounded-2xl border border-gray-200">
-          <div className="flex items-center space-x-2 mb-4">
-            <Users className="h-5 w-5 text-gray-700" />
-            <h3 className="font-semibold text-gray-700">Customers</h3>
-          </div>
-          <p className="text-3xl font-bold text-gray-900">0</p>
-        </Card>
-
-        {/* Top Links Section */}
-        <Card className="p-6 bg-white rounded-2xl border border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center space-x-2">
-              <LinkIcon className="h-5 w-5 text-gray-700" />
-              <h3 className="font-semibold text-gray-700">Top Links</h3>
-            </div>
-          </div>
-          <div className="text-center py-8 text-gray-500">
-            <Package className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-            <p>No links created yet</p>
-            <Button className="mt-4 bg-green-600 hover:bg-green-700 text-white rounded-full">
-              Create Your First Link
-            </Button>
-          </div>
-        </Card>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Card className="p-4 bg-white rounded-2xl border border-gray-200" data-testid="stat-views">
+            <div className="flex items-center space-x-2 mb-2"><Eye className="h-4 w-4 text-cyan-500" /><span className="text-xs text-gray-500">Views</span></div>
+            <p className="text-2xl font-bold text-gray-900">{stats?.total_views?.toLocaleString() || 0}</p>
+          </Card>
+          <Card className="p-4 bg-white rounded-2xl border border-gray-200" data-testid="stat-purchases">
+            <div className="flex items-center space-x-2 mb-2"><ShoppingBag className="h-4 w-4 text-green-500" /><span className="text-xs text-gray-500">Sales</span></div>
+            <p className="text-2xl font-bold text-gray-900">{stats?.total_purchases?.toLocaleString() || 0}</p>
+          </Card>
+          <Card className="p-4 bg-white rounded-2xl border border-gray-200" data-testid="stat-customers">
+            <div className="flex items-center space-x-2 mb-2"><Users className="h-4 w-4 text-purple-500" /><span className="text-xs text-gray-500">Customers</span></div>
+            <p className="text-2xl font-bold text-gray-900">{stats?.total_customers?.toLocaleString() || 0}</p>
+          </Card>
+          <Card className="p-4 bg-white rounded-2xl border border-gray-200" data-testid="stat-links">
+            <div className="flex items-center space-x-2 mb-2"><LinkIcon className="h-4 w-4 text-orange-500" /><span className="text-xs text-gray-500">Links</span></div>
+            <p className="text-2xl font-bold text-gray-900">{stats?.total_links?.toLocaleString() || 0} <span className="text-sm text-gray-400">({stats?.active_links || 0} active)</span></p>
+          </Card>
+        </div>
       </main>
 
       {/* Desktop Sidebar */}

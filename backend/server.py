@@ -1066,6 +1066,153 @@ async def get_wallet(current_user: User = Depends(get_current_user)):
         creators_earnings=creators_earnings
     )
 
+
+# Creator Analytics / Stats / Customers / Transactions Routes
+@api_router.get("/creators/{creator_id}/stats")
+async def get_creator_stats(creator_id: str, current_user: User = Depends(get_current_user)):
+    """Dashboard summary stats for a creator"""
+    creator_doc = await db.creators.find_one({"id": creator_id, "user_id": current_user.id}, {"_id": 0})
+    if not creator_doc:
+        raise HTTPException(status_code=404, detail="Creator not found")
+    
+    links = await db.links.find({"creator_id": creator_id}, {"_id": 0}).to_list(1000)
+    total_views = sum(l.get('views', 0) for l in links)
+    total_purchases = sum(l.get('purchases', 0) for l in links)
+    
+    transactions = await db.transactions.find({"creator_id": creator_id}, {"_id": 0}).to_list(1000)
+    total_earned = sum(t.get('amount', 0.0) for t in transactions)
+    
+    customers = await db.purchases.find({"creator_id": creator_id}, {"_id": 0}).to_list(1000)
+    unique_customer_ids = set(c.get('customer_id') for c in customers if c.get('customer_id'))
+    
+    return {
+        "total_views": total_views,
+        "total_purchases": total_purchases,
+        "total_earned": round(total_earned, 2),
+        "total_customers": len(unique_customer_ids),
+        "total_links": len(links),
+        "active_links": len([l for l in links if l.get('is_active')])
+    }
+
+@api_router.get("/creators/{creator_id}/analytics")
+async def get_creator_analytics(creator_id: str, current_user: User = Depends(get_current_user)):
+    """Analytics data: top links, recent purchases"""
+    creator_doc = await db.creators.find_one({"id": creator_id, "user_id": current_user.id}, {"_id": 0})
+    if not creator_doc:
+        raise HTTPException(status_code=404, detail="Creator not found")
+    
+    # Top links by views
+    links = await db.links.find({"creator_id": creator_id}, {"_id": 0}).to_list(1000)
+    top_links = sorted(links, key=lambda l: l.get('views', 0), reverse=True)[:5]
+    top_links_data = [{
+        "id": l['id'], "title": l['title'], "short_link": l.get('short_link', ''),
+        "views": l.get('views', 0), "purchases": l.get('purchases', 0), "price": l.get('price', 0)
+    } for l in top_links]
+    
+    # Summary stats
+    total_views = sum(l.get('views', 0) for l in links)
+    total_purchases = sum(l.get('purchases', 0) for l in links)
+    
+    purchases = await db.purchases.find({"creator_id": creator_id}, {"_id": 0}).to_list(1000)
+    unique_customer_ids = set(p.get('customer_id') for p in purchases if p.get('customer_id'))
+    
+    # Top customers by purchase count
+    customer_spend = {}
+    for p in purchases:
+        cid = p.get('customer_id', '')
+        if cid:
+            if cid not in customer_spend:
+                customer_spend[cid] = {"count": 0, "total": 0.0}
+            customer_spend[cid]["count"] += 1
+            customer_spend[cid]["total"] += p.get('amount', 0.0)
+    
+    top_customer_ids = sorted(customer_spend, key=lambda k: customer_spend[k]["total"], reverse=True)[:5]
+    top_customers = []
+    for cid in top_customer_ids:
+        cdoc = await db.customers.find_one({"id": cid}, {"_id": 0})
+        top_customers.append({
+            "id": cid,
+            "email": cdoc.get('email', '') if cdoc else '',
+            "name": cdoc.get('name', '') if cdoc else '',
+            "purchases": customer_spend[cid]["count"],
+            "total_spent": round(customer_spend[cid]["total"], 2)
+        })
+    
+    return {
+        "views": total_views,
+        "customers": len(unique_customer_ids),
+        "sales": total_purchases,
+        "top_links": top_links_data,
+        "top_customers": top_customers
+    }
+
+@api_router.get("/creators/{creator_id}/customers")
+async def get_creator_customers(creator_id: str, current_user: User = Depends(get_current_user)):
+    """List customers who purchased from this creator"""
+    creator_doc = await db.creators.find_one({"id": creator_id, "user_id": current_user.id}, {"_id": 0})
+    if not creator_doc:
+        raise HTTPException(status_code=404, detail="Creator not found")
+    
+    purchases = await db.purchases.find({"creator_id": creator_id}, {"_id": 0}).to_list(10000)
+    
+    # Aggregate by customer
+    customer_data = {}
+    for p in purchases:
+        cid = p.get('customer_id', '')
+        if not cid:
+            continue
+        if cid not in customer_data:
+            customer_data[cid] = {"purchases": 0, "total_spent": 0.0, "last_purchase": p.get('created_at', '')}
+        customer_data[cid]["purchases"] += 1
+        customer_data[cid]["total_spent"] += p.get('amount', 0.0)
+        if p.get('created_at', '') > customer_data[cid]["last_purchase"]:
+            customer_data[cid]["last_purchase"] = p.get('created_at', '')
+    
+    # Fetch customer details
+    result = []
+    for cid, data in customer_data.items():
+        cdoc = await db.customers.find_one({"id": cid}, {"_id": 0})
+        result.append({
+            "id": cid,
+            "email": cdoc.get('email', 'Unknown') if cdoc else 'Unknown',
+            "name": cdoc.get('name', '') if cdoc else '',
+            "purchases": data["purchases"],
+            "total_spent": round(data["total_spent"], 2),
+            "last_purchase": data["last_purchase"]
+        })
+    
+    result.sort(key=lambda c: c["total_spent"], reverse=True)
+    return result
+
+@api_router.get("/creators/{creator_id}/transactions")
+async def get_creator_transactions(creator_id: str, current_user: User = Depends(get_current_user)):
+    """List transactions for this creator"""
+    creator_doc = await db.creators.find_one({"id": creator_id, "user_id": current_user.id}, {"_id": 0})
+    if not creator_doc:
+        raise HTTPException(status_code=404, detail="Creator not found")
+    
+    # Get purchases (sales from buyer perspective) and join with link + customer info
+    purchases = await db.purchases.find({"creator_id": creator_id}, {"_id": 0}).to_list(10000)
+    
+    result = []
+    for p in purchases:
+        link_doc = await db.links.find_one({"id": p.get('link_id', '')}, {"_id": 0, "title": 1})
+        customer_doc = await db.customers.find_one({"id": p.get('customer_id', '')}, {"_id": 0, "email": 1, "name": 1})
+        
+        result.append({
+            "id": p.get('id', ''),
+            "link_title": link_doc.get('title', 'Unknown') if link_doc else 'Unknown',
+            "customer_email": customer_doc.get('email', 'Unknown') if customer_doc else 'Unknown',
+            "customer_name": customer_doc.get('name', '') if customer_doc else '',
+            "amount": p.get('amount', 0.0),
+            "status": p.get('status', 'completed'),
+            "created_at": p.get('created_at', '')
+        })
+    
+    result.sort(key=lambda t: t["created_at"], reverse=True)
+    return result
+
+
 # File Upload Routes
 @api_router.post("/upload")
 async def upload_file(
