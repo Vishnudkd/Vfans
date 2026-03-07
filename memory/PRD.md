@@ -8,39 +8,33 @@ Build the "VFans Media" application - a multi-tenant creator platform where user
 - **Backend**: FastAPI + Motor (async MongoDB)
 - **Database**: MongoDB
 - **Integrations**: Resend (email), Stripe (payments)
-- **Structure**: User → Organization → Creator → Links
+- **Structure**: User -> Organization -> Creator -> Links
 
 ## What's Been Implemented
 
-### Phase 1: Authentication & Onboarding ✅
+### Phase 1: Authentication & Onboarding
 - User signup/login with JWT tokens
 - Email verification via Resend API
 - Demo user (demo@vfans.com/demo) with auto-reset
 - Organization creation flow
 - Creator profile creation
 
-### Phase 2: Dashboard & Creator Pages ✅
+### Phase 2: Dashboard & Creator Pages
 - Creator dashboard with sidebar navigation
 - Links, Analytics, Customers, Transactions pages (placeholder data)
 - Wallet page with real data from backend
 - Multi-creator sidebar with expand/collapse
 
-### Phase 3: Link Creation & Payments ✅ (Completed Feb 2026)
-- **File Upload**: POST /api/upload - handles image/video/audio/PDF with blurred preview generation
+### Phase 3: Link Creation & Payments (Completed Mar 7, 2026)
+- **Multi-File Upload**: Up to 10 images / 3 videos, total max 10 files per link
+- **Blurred Preview**: Backend generates blurred previews for images, served at /api/uploads/
 - **Link CRUD**: Create, list, update, delete, toggle active status
-- **Create Link Form**: Full form with drag-and-drop file upload, title, description, price, blur level, short link, fee settings
+- **Create Link Form**: Multi-file drag-and-drop upload, title, description, price (min $5.99), blur level, short link, fee settings
 - **Stripe Integration**: Checkout session creation, webhook handling, purchase verification
-- **Public Link Page**: Redesigned to match SeeIt.co design with:
-  - Hero section with blurred preview, gradient overlay, lock icon, "UNLOCK FOR" price
-  - Creator info with avatar, name, verified badge
-  - File type tags, description
-  - Email input for purchaser
-  - Green "Unlock for $X.XX" CTA button
-  - Trust badges (Secure payment, Instant access, Private download)
-  - Terms of Service link
+- **Public Link Page** (/l/{slug}): SeeIt.co-style design with blurred hero, lock overlay, creator info, file tags, email input, "Unlock for $X.XX" button, trust badges
 - **Payment Success Page**: Verifies purchase via session_id, shows download button
-- **Links Page**: List view with Copy link, View, Toggle, Delete actions
-- **Backend Endpoint**: /api/links/by-slug/{short_link} returns link + creator_info
+- **Links Page**: List view with Copy link (toast), View, Toggle, Delete actions
+- **Static File Serving**: Files served via /api/uploads/ for proper ingress routing
 
 ## Key Routes
 - `/l/:shortLink` - Public link purchase page
@@ -66,6 +60,7 @@ Build the "VFans Media" application - a multi-tenant creator platform where user
 - Enhanced analytics with charts
 - Member management
 - Content provider agreement flow
+- Open Graph meta tags for link sharing previews
 
 ## Credentials
 - Demo: demo@vfans.com / demo
