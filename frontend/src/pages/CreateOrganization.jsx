@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
@@ -13,12 +13,52 @@ const CreateOrganization = () => {
   const navigate = useNavigate();
   const { token } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
     logo_url: ''
   });
 
   const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+
+  // Check if user already has an organization
+  useEffect(() => {
+    const checkExistingOrganization = async () => {
+      try {
+        const orgResponse = await axios.get(`${API_URL}/api/organizations`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (orgResponse.data) {
+          // User already has organization, check for creators
+          const creatorsResponse = await axios.get(`${API_URL}/api/creators`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          
+          if (creatorsResponse.data && creatorsResponse.data.length > 0) {
+            // Has organization and creators, redirect to dashboard
+            navigate(`/creator/${creatorsResponse.data[0].id}/dashboard`);
+          } else {
+            // Has org but no creators, redirect to create creator
+            navigate('/create-creator');
+          }
+        } else {
+          // No organization, show the form
+          setIsChecking(false);
+        }
+      } catch (error) {
+        // If 404, user doesn't have organization - show form
+        if (error.response?.status === 404) {
+          setIsChecking(false);
+        } else {
+          // Other error, still show form
+          setIsChecking(false);
+        }
+      }
+    };
+
+    checkExistingOrganization();
+  }, [token, API_URL, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -90,6 +130,18 @@ const CreateOrganization = () => {
       setIsSubmitting(false);
     }
   };
+
+  // Show loading while checking
+  if (isChecking) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">

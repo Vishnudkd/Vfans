@@ -112,41 +112,40 @@ const Login = () => {
           description: "Welcome back to VFans Media. Redirecting...",
         });
         
+        // Get the token from localStorage after login
+        const authToken = localStorage.getItem('token');
+        
         // Check if user has organization and creators
-        try {
-          const orgResponse = await axios.get(`${API_URL}/api/organizations`, {
-            headers: { 'Authorization': `Bearer ${result.user.token || token}` }
-          });
-          
-          if (orgResponse.data) {
-            // Has organization, check for creators
-            const creatorsResponse = await axios.get(`${API_URL}/api/creators`, {
-              headers: { 'Authorization': `Bearer ${result.user.token || token}` }
+        setTimeout(async () => {
+          try {
+            const orgResponse = await axios.get(`${API_URL}/api/organizations`, {
+              headers: { 'Authorization': `Bearer ${authToken}` }
             });
             
-            if (creatorsResponse.data && creatorsResponse.data.length > 0) {
-              // Redirect to first creator's dashboard
-              setTimeout(() => {
+            if (orgResponse.data) {
+              // Has organization, check for creators
+              const creatorsResponse = await axios.get(`${API_URL}/api/creators`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+              });
+              
+              if (creatorsResponse.data && creatorsResponse.data.length > 0) {
+                // Redirect to first creator's dashboard
                 navigate(`/creator/${creatorsResponse.data[0].id}/dashboard`);
-              }, 1000);
-            } else {
-              // No creators, redirect to create one
-              setTimeout(() => {
+              } else {
+                // Has org but no creators, this shouldn't happen but redirect to create creator
                 navigate('/create-creator');
-              }, 1000);
+              }
             }
-          } else {
-            // No organization, redirect to create one
-            setTimeout(() => {
+          } catch (error) {
+            // If 404, user doesn't have organization yet
+            if (error.response?.status === 404) {
               navigate('/create-organization');
-            }, 1000);
+            } else {
+              // Other error, try to navigate to create organization
+              navigate('/create-organization');
+            }
           }
-        } catch (error) {
-          // If error checking organization, probably doesn't exist
-          setTimeout(() => {
-            navigate('/create-organization');
-          }, 1000);
-        }
+        }, 800);
       } else {
         // Check if error is about email verification
         if (result.error && result.error.includes('verify your email')) {
