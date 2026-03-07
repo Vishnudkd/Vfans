@@ -104,13 +104,33 @@ const Login = () => {
     setShowResendButton(false);
 
     try {
+      // Check if this is the demo user and reset their data
+      if (formData.email === 'demo@vfans.com') {
+        try {
+          await axios.post(`${API_URL}/api/demo/reset`);
+        } catch (error) {
+          // If demo user doesn't exist, initialize it
+          await axios.post(`${API_URL}/api/demo/initialize`);
+        }
+      }
+
       const result = await login(formData.email, formData.password);
       
       if (result.success) {
         toast({
           title: "Login Successful!",
-          description: "Welcome back to VFans Media. Redirecting...",
+          description: formData.email === 'demo@vfans.com' 
+            ? "Demo mode activated! Starting fresh onboarding flow..." 
+            : "Welcome back to VFans Media. Redirecting...",
         });
+        
+        // For demo user, always go to create organization
+        if (formData.email === 'demo@vfans.com') {
+          setTimeout(() => {
+            navigate('/create-organization');
+          }, 1000);
+          return;
+        }
         
         // Get the token from localStorage after login
         const authToken = localStorage.getItem('token');

@@ -541,6 +541,97 @@ async def resend_verification(email: EmailStr):
         "message": "Verification email sent! Please check your inbox."
     }
 
+# Demo User Management
+@api_router.post("/demo/reset")
+async def reset_demo_user():
+    """Reset demo user to fresh state - for testing purposes"""
+    demo_email = "demo@vfans.com"
+    
+    # Find demo user
+    demo_user = await db.users.find_one({"email": demo_email}, {"_id": 0})
+    
+    if demo_user:
+        user_id = demo_user['id']
+        
+        # Delete all creators for demo user
+        await db.creators.delete_many({"user_id": user_id})
+        
+        # Delete organization for demo user
+        await db.organizations.delete_many({"user_id": user_id})
+        
+        return {
+            "status": "success",
+            "message": "Demo user reset successfully. Ready for new onboarding flow."
+        }
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Demo user not found"
+        )
+
+@api_router.post("/demo/initialize")
+async def initialize_demo_user():
+    """Create or reset demo user account"""
+    demo_email = "demo@vfans.com"
+    demo_password = "demo"
+    
+    # Check if demo user exists
+    existing_user = await db.users.find_one({"email": demo_email})
+    
+    if existing_user:
+        # User exists, reset their data
+        user_id = existing_user['id']
+        
+        # Delete all creators
+        await db.creators.delete_many({"user_id": user_id})
+        
+        # Delete organization
+        await db.organizations.delete_many({"user_id": user_id})
+        
+        # Update user password and verify email
+        await db.users.update_one(
+            {"email": demo_email},
+            {
+                "$set": {
+                    "hashed_password": get_password_hash(demo_password),
+                    "email_verified": True,
+                    "verification_token": None,
+                    "is_active": True
+                }
+            }
+        )
+        
+        return {
+            "status": "success",
+            "message": "Demo user reset and ready for testing",
+            "email": demo_email,
+            "password": demo_password
+        }
+    else:
+        # Create new demo user
+        demo_user = User(
+            email=demo_email,
+            hashed_password=get_password_hash(demo_password),
+            full_name="Demo User",
+            email_verified=True,  # Pre-verified for testing
+            verification_token=None,
+            is_active=True
+        )
+        
+        # Convert to dict and serialize datetime
+        user_doc = demo_user.model_dump()
+        user_doc['created_at'] = user_doc['created_at'].isoformat()
+        
+        # Insert into database
+        await db.users.insert_one(user_doc)
+        
+        return {
+            "status": "success",
+            "message": "Demo user created successfully",
+            "email": demo_email,
+            "password": demo_password
+        }
+
 # Organization Routes
 @api_router.post("/organizations", response_model=OrganizationResponse, status_code=status.HTTP_201_CREATED)
 async def create_organization(org_data: OrganizationCreate, current_user: User = Depends(get_current_user)):
