@@ -150,6 +150,36 @@ class CreatorResponse(BaseModel):
     bio: Optional[str] = None
     created_at: datetime
 
+# Transaction Models
+class Transaction(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    organization_id: str
+    creator_id: str
+    amount: float
+    status: str  # pending, available, paid_out
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    available_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc) + timedelta(days=7))
+
+class TransactionResponse(BaseModel):
+    id: str
+    user_id: str
+    organization_id: str
+    creator_id: str
+    amount: float
+    status: str
+    created_at: datetime
+    available_at: datetime
+
+class WalletSummary(BaseModel):
+    total_earned: float
+    available_to_withdraw: float
+    pending: float
+    paid_out: float
+    creators_earnings: List[dict]
+
 # Utility Functions
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against a hash"""
@@ -794,6 +824,80 @@ async def delete_creator(creator_id: str, current_user: User = Depends(get_curre
         "status": "success",
         "message": "Creator profile deleted successfully"
     }
+
+# Wallet Routes
+@api_router.get("/wallet", response_model=WalletSummary)
+async def get_wallet(current_user: User = Depends(get_current_user)):
+    """Get wallet summary for organization"""
+    # Get user's organization
+    org_doc = await db.organizations.find_one({"user_id": current_user.id}, {"_id": 0})
+    
+    if not org_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No organization found"
+        )
+    
+    # Get all creators under this organization
+    creators = await db.creators.find({
+        "user_id": current_user.id,
+        "organization_id": org_doc['id']
+    }, {"_id": 0}).to_list(1000)
+    
+    # Get all transactions for this organization
+    transactions = await db.transactions.find({
+        "user_id": current_user.id,
+        "organization_id": org_doc['id']
+    }, {"_id": 0}).to_list(1000)
+    
+    # Calculate totals
+    total_earned = 0.0
+    available_to_withdraw = 0.0
+    pending = 0.0
+    paid_out = 0.0
+    
+    current_time = datetime.now(timezone.utc)
+    
+    for txn in transactions:
+        amount = txn.get('amount', 0.0)
+        total_earned += amount
+        
+        # Parse dates
+        available_at = txn.get('available_at')
+        if isinstance(available_at, str):
+            available_at = datetime.fromisoformat(available_at)
+        
+        txn_status = txn.get('status', 'pending')
+        
+        if txn_status == 'paid_out':
+            paid_out += amount
+        elif txn_status == 'available' or (available_at and current_time >= available_at):
+            available_to_withdraw += amount
+        else:
+            pending += amount
+    
+    # Calculate per-creator earnings
+    creators_earnings = []
+    for creator in creators:
+        creator_id = creator['id']
+        creator_txns = [t for t in transactions if t.get('creator_id') == creator_id]
+        creator_total = sum(t.get('amount', 0.0) for t in creator_txns)
+        
+        creators_earnings.append({
+            "creator_id": creator_id,
+            "creator_name": creator.get('name', 'Unknown'),
+            "creator_picture": creator.get('profile_picture'),
+            "total_earned": creator_total,
+            "transaction_count": len(creator_txns)
+        })
+    
+    return WalletSummary(
+        total_earned=total_earned,
+        available_to_withdraw=available_to_withdraw,
+        pending=pending,
+        paid_out=paid_out,
+        creators_earnings=creators_earnings
+    )
 
 # Include the router in the main app
 app.include_router(api_router)

@@ -124,7 +124,10 @@ const Dashboard = () => {
       {/* Main Navigation */}
       <div className="flex-1 overflow-y-auto">
         <nav className="p-4 space-y-1">
-          <button className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+          <button
+            onClick={() => { navigate('/wallet'); setSidebarOpen(false); }}
+            className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+          >
             <Wallet className="h-5 w-5" />
             <span>Wallet</span>
           </button>

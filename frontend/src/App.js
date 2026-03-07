@@ -18,6 +18,7 @@ import CreatorLinks from "./pages/CreatorLinks";
 import CreatorAnalytics from "./pages/CreatorAnalytics";
 import CreatorCustomers from "./pages/CreatorCustomers";
 import CreatorTransactions from "./pages/CreatorTransactions";
+import Wallet from "./pages/Wallet";
 import PricingPage from "./pages/PricingPage";
 import Contact from "./pages/Contact";
 import Support from "./pages/Support";
@@ -104,6 +105,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <CreatorTransactions />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/wallet" 
+              element={
+                <ProtectedRoute>
+                  <Wallet />
                 </ProtectedRoute>
               } 
             />
