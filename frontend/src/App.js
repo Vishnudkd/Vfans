@@ -20,6 +20,8 @@ import CreatorCustomers from "./pages/CreatorCustomers";
 import CreatorTransactions from "./pages/CreatorTransactions";
 import Wallet from "./pages/Wallet";
 import CreateLink from "./pages/CreateLink";
+import LinkPurchase from "./pages/LinkPurchase";
+import PaymentSuccess from "./pages/PaymentSuccess";
 import PricingPage from "./pages/PricingPage";
 import Contact from "./pages/Contact";
 import Support from "./pages/Support";
@@ -127,6 +129,8 @@ function App() {
             />
 
             {/* Public Pages */}
+            <Route path="/l/:shortLink" element={<LinkPurchase />} />
+            <Route path="/purchase/success" element={<PaymentSuccess />} />
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/support" element={<Support />} />

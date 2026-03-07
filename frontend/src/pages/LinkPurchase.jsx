@@ -21,9 +21,7 @@ const LinkPurchase = () => {
   useEffect(() => {
     const fetchLink = async () => {
       try {
-        // First get the link by short_link (we need to add this endpoint or fetch all and filter)
-        // For now, let's assume we pass link_id in URL
-        const response = await axios.get(`${API_URL}/api/links/${shortLink}`);
+        const response = await axios.get(`${API_URL}/api/links/by-slug/${shortLink}`);
         setLink(response.data);
       } catch (error) {
         setError('Link not found or unavailable');

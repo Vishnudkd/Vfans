@@ -1199,6 +1199,29 @@ async def get_creator_links(creator_id: str, current_user: User = Depends(get_cu
     
     return [LinkResponse(**link) for link in links]
 
+@api_router.get("/links/by-slug/{short_link}", response_model=LinkResponse)
+async def get_link_by_slug(short_link: str):
+    """Get a specific link by short_link slug (public endpoint)"""
+    link_doc = await db.links.find_one({"short_link": short_link}, {"_id": 0})
+    
+    if not link_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Link not found"
+        )
+    
+    # Convert ISO string timestamps back to datetime
+    if isinstance(link_doc.get('created_at'), str):
+        link_doc['created_at'] = datetime.fromisoformat(link_doc['created_at'])
+    
+    # Increment view count
+    await db.links.update_one(
+        {"short_link": short_link},
+        {"$inc": {"views": 1}}
+    )
+    
+    return LinkResponse(**link_doc)
+
 @api_router.get("/links/{link_id}", response_model=LinkResponse)
 async def get_link(link_id: str):
     """Get a specific link by ID (public endpoint)"""

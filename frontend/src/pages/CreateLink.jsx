@@ -73,13 +73,13 @@ const CreateLink = () => {
   const handleFileUpload = async (file) => {
     setIsUploading(true);
     
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('creator_id', creatorId);
-    formData.append('blur_level', formData.blur_level || 'medium');
+    const uploadData = new FormData();
+    uploadData.append('file', file);
+    uploadData.append('creator_id', creatorId);
+    uploadData.append('blur_level', formData.blur_level || 'medium');
 
     try {
-      const response = await axios.post(`${API_URL}/api/upload`, formData, {
+      const response = await axios.post(`${API_URL}/api/upload`, uploadData, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'multipart/form-data'

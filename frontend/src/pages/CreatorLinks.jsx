@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
-import { ArrowLeft, Search, Link as LinkIcon, Eye, DollarSign, Video, Music, FileText, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, Search, Link as LinkIcon, Eye, DollarSign, Video, Music, FileText, ShoppingCart, Copy, ExternalLink } from 'lucide-react';
 
 const CreatorLinks = () => {
   const { token } = useAuth();
@@ -54,6 +54,11 @@ const CreatorLinks = () => {
     totalLinks: links.length,
     totalViews: links.reduce((sum, link) => sum + (link.views || 0), 0),
     totalEarned: links.reduce((sum, link) => sum + (link.purchases || 0) * link.price, 0)
+  };
+
+  const handleCopyLink = (shortLink) => {
+    const publicUrl = `${window.location.origin}/l/${shortLink}`;
+    navigator.clipboard.writeText(publicUrl);
   };
 
   const handleToggleStatus = async (linkId) => {
@@ -302,7 +307,26 @@ const CreatorLinks = () => {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => handleCopyLink(link.short_link)}
+                      data-testid={`copy-link-${link.id}`}
+                    >
+                      <Copy className="h-3 w-3 mr-1" />
+                      Copy
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(`/l/${link.short_link}`, '_blank')}
+                      data-testid={`view-link-${link.id}`}
+                    >
+                      <ExternalLink className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => handleToggleStatus(link.id)}
+                      data-testid={`toggle-link-${link.id}`}
                     >
                       {link.is_active ? 'Deactivate' : 'Activate'}
                     </Button>
@@ -311,6 +335,7 @@ const CreatorLinks = () => {
                       size="sm"
                       onClick={() => handleDeleteLink(link.id)}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      data-testid={`delete-link-${link.id}`}
                     >
                       Delete
                     </Button>

@@ -13,7 +13,7 @@ import jwt
 import re
 
 # Backend API base URL from frontend .env
-BASE_URL = "https://vfans-build.preview.emergentagent.com/api"
+BASE_URL = "https://payment-flow-165.preview.emergentagent.com/api"
 
 class VFansAPITester:
     def __init__(self):
