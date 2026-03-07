@@ -1,6 +1,7 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Form, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -290,6 +291,16 @@ class PurchaseResponse(BaseModel):
     amount: float
     status: str
     created_at: datetime
+
+# Sandbox Access Model - temporary access tokens for purchased content
+class SandboxAccess(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    token: str = Field(default_factory=lambda: secrets.token_urlsafe(48))
+    purchase_id: str
+    link_id: str
+    files: List[dict] = []  # [{original_path, type, name}]
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc) + timedelta(hours=24))
 
 # Utility Functions
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -1501,34 +1512,194 @@ async def stripe_webhook(request: Request):
 
 @api_router.get("/purchases/verify/{session_id}")
 async def verify_purchase(session_id: str):
-    """Verify purchase and get access to content"""
-    # Find purchase by session ID
+    """Verify purchase by checking Stripe session directly and get access to content"""
+    # First check if we already have a purchase record (from webhook)
     purchase_doc = await db.purchases.find_one({"stripe_session_id": session_id}, {"_id": 0})
     
     if not purchase_doc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Purchase not found"
+        # Webhook hasn't fired yet — verify directly with Stripe API
+        try:
+            session = stripe.checkout.Session.retrieve(session_id)
+        except Exception as e:
+            logger.error(f"Failed to retrieve Stripe session: {e}")
+            raise HTTPException(status_code=404, detail="Purchase not found")
+        
+        if session.payment_status != 'paid':
+            raise HTTPException(status_code=400, detail="Payment not completed")
+        
+        link_id = session.metadata.get('link_id')
+        creator_id = session.metadata.get('creator_id')
+        user_id = session.metadata.get('user_id')
+        organization_id = session.metadata.get('organization_id')
+        customer_email = session.customer_details.email if session.customer_details else None
+        customer_name = session.customer_details.name if session.customer_details else None
+        
+        # Create customer if needed
+        customer_id = None
+        if customer_email:
+            customer_doc = await db.customers.find_one({"email": customer_email}, {"_id": 0})
+            if not customer_doc:
+                customer = Customer(email=customer_email, name=customer_name)
+                customer_dict = customer.model_dump()
+                customer_dict['created_at'] = customer_dict['created_at'].isoformat()
+                await db.customers.insert_one(customer_dict)
+                customer_id = customer.id
+            else:
+                customer_id = customer_doc['id']
+        
+        # Create purchase record
+        purchase = Purchase(
+            customer_id=customer_id or "",
+            link_id=link_id,
+            creator_id=creator_id,
+            amount=session.amount_total / 100,
+            stripe_session_id=session.id,
+            status='completed'
         )
+        purchase_dict = purchase.model_dump()
+        purchase_dict['created_at'] = purchase_dict['created_at'].isoformat()
+        await db.purchases.insert_one(purchase_dict)
+        
+        # Create transaction (80% to creator)
+        creator_amount = (session.amount_total / 100) * 0.8
+        transaction = Transaction(
+            user_id=user_id,
+            organization_id=organization_id,
+            creator_id=creator_id,
+            amount=creator_amount,
+            status='pending'
+        )
+        transaction_dict = transaction.model_dump()
+        transaction_dict['created_at'] = transaction_dict['created_at'].isoformat()
+        transaction_dict['available_at'] = transaction_dict['available_at'].isoformat()
+        await db.transactions.insert_one(transaction_dict)
+        
+        # Update link purchase count
+        await db.links.update_one({"id": link_id}, {"$inc": {"purchases": 1}})
+        
+        purchase_doc = purchase_dict
+        # Remove _id if present
+        purchase_doc.pop('_id', None)
+        
+        logger.info(f"Purchase verified via Stripe API for session {session_id}")
     
     # Get link details
     link_doc = await db.links.find_one({"id": purchase_doc['link_id']}, {"_id": 0})
     
     if not link_doc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Link not found"
+        raise HTTPException(status_code=404, detail="Link not found")
+    
+    # Build file list from link data (original paths stored privately)
+    link_files = link_doc.get('files', [])
+    if not link_files and link_doc.get('file_url'):
+        link_files = [{
+            'url': link_doc['file_url'],
+            'type': link_doc.get('file_type', 'image'),
+            'name': 'content',
+            'preview_url': link_doc.get('preview_url')
+        }]
+    
+    # Check if sandbox access already exists for this purchase
+    existing_sandbox = await db.sandbox_access.find_one(
+        {"purchase_id": purchase_doc['id'], "expires_at": {"$gt": datetime.now(timezone.utc).isoformat()}},
+        {"_id": 0}
+    )
+    
+    if existing_sandbox:
+        sandbox_token = existing_sandbox['token']
+        sandbox_files = existing_sandbox['files']
+    else:
+        # Create sandbox access with 24h expiry
+        sandbox = SandboxAccess(
+            purchase_id=purchase_doc['id'],
+            link_id=purchase_doc['link_id'],
+            files=[{
+                'original_path': f.get('url', ''),
+                'type': f.get('type', 'image'),
+                'name': f.get('name', f'file_{i}')
+            } for i, f in enumerate(link_files)]
         )
+        sandbox_dict = sandbox.model_dump()
+        sandbox_dict['created_at'] = sandbox_dict['created_at'].isoformat()
+        sandbox_dict['expires_at'] = sandbox_dict['expires_at'].isoformat()
+        await db.sandbox_access.insert_one(sandbox_dict)
+        sandbox_token = sandbox.token
+        sandbox_files = sandbox_dict['files']
+    
+    # Build sandbox URLs for the buyer (no original paths exposed)
+    sandbox_urls = []
+    for i, f in enumerate(sandbox_files):
+        sandbox_urls.append({
+            'url': f"/api/sandbox/{sandbox_token}/{i}",
+            'type': f.get('type', 'image'),
+            'name': f.get('name', f'file_{i}')
+        })
     
     return {
         "status": "success",
-        "purchase": purchase_doc,
+        "purchase": {
+            "id": purchase_doc['id'],
+            "amount": purchase_doc.get('amount'),
+            "status": purchase_doc.get('status'),
+            "created_at": purchase_doc.get('created_at')
+        },
         "link": {
-            "title": link_doc['title'],
-            "file_url": link_doc['file_url'],
-            "file_type": link_doc['file_type']
-        }
+            "title": link_doc['title']
+        },
+        "content": sandbox_urls,
+        "expires_in_hours": 24
     }
+
+@api_router.get("/sandbox/{token}/{file_index}")
+async def serve_sandbox_file(token: str, file_index: int):
+    """Serve a purchased file via sandbox token (expires after 24h)"""
+    sandbox_doc = await db.sandbox_access.find_one({"token": token}, {"_id": 0})
+    
+    if not sandbox_doc:
+        raise HTTPException(status_code=404, detail="Access link not found or expired")
+    
+    # Check expiry
+    expires_at = sandbox_doc.get('expires_at')
+    if isinstance(expires_at, str):
+        expires_at = datetime.fromisoformat(expires_at)
+    
+    if datetime.now(timezone.utc) > expires_at:
+        # Clean up expired record
+        await db.sandbox_access.delete_one({"token": token})
+        raise HTTPException(status_code=410, detail="This access link has expired")
+    
+    files = sandbox_doc.get('files', [])
+    if file_index < 0 or file_index >= len(files):
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    file_entry = files[file_index]
+    original_path = file_entry.get('original_path', '')
+    
+    # Convert URL path to filesystem path
+    # original_path is like /api/uploads/user_id/creator_id/file_id/original.jpg
+    relative_path = original_path.replace('/api/uploads/', '')
+    file_path = UPLOAD_DIR / relative_path
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found on server")
+    
+    # Determine media type
+    file_type = file_entry.get('type', 'image')
+    suffix = file_path.suffix.lower()
+    media_types = {
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+        '.gif': 'image/gif', '.webp': 'image/webp',
+        '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.avi': 'video/x-msvideo',
+        '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg',
+        '.pdf': 'application/pdf'
+    }
+    media_type = media_types.get(suffix, 'application/octet-stream')
+    
+    return FileResponse(
+        path=str(file_path),
+        media_type=media_type,
+        filename=file_entry.get('name', file_path.name)
+    )
 
 # Include the router in the main app
 app.include_router(api_router)
@@ -1554,3 +1725,19 @@ logger = logging.getLogger(__name__)
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+# Background task: clean up expired sandbox access records every hour
+async def cleanup_expired_sandbox():
+    while True:
+        try:
+            now = datetime.now(timezone.utc).isoformat()
+            result = await db.sandbox_access.delete_many({"expires_at": {"$lt": now}})
+            if result.deleted_count > 0:
+                logger.info(f"Cleaned up {result.deleted_count} expired sandbox access records")
+        except Exception as e:
+            logger.error(f"Sandbox cleanup error: {e}")
+        await asyncio.sleep(3600)  # Run every hour
+
+@app.on_event("startup")
+async def start_cleanup_task():
+    asyncio.create_task(cleanup_expired_sandbox())
