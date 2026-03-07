@@ -4,7 +4,26 @@ import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
-import { LogOut, User, Settings, FileText, ArrowLeft } from 'lucide-react';
+import { Sheet, SheetContent, SheetTrigger } from '../components/ui/sheet';
+import { 
+  Menu, 
+  Home, 
+  Wallet, 
+  Users, 
+  LifeBuoy, 
+  LayoutDashboard,
+  User,
+  TrendingUp,
+  ShoppingBag,
+  CreditCard,
+  Link as LinkIcon,
+  Plus,
+  ChevronDown,
+  ChevronUp,
+  DollarSign,
+  Package,
+  Eye
+} from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 
 const Dashboard = () => {
@@ -13,26 +32,44 @@ const Dashboard = () => {
   const { creatorId } = useParams();
   const { toast } = useToast();
   const [creator, setCreator] = useState(null);
+  const [creators, setCreators] = useState([]);
+  const [organization, setOrganization] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [expandedCreator, setExpandedCreator] = useState(creatorId || null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
   useEffect(() => {
-    const fetchCreator = async () => {
+    const fetchData = async () => {
       if (!creatorId) {
-        // No creator ID, redirect to creators list
         navigate('/creators');
         return;
       }
 
       try {
-        const response = await axios.get(`${API_URL}/api/creators/${creatorId}`, {
+        // Fetch current creator
+        const creatorResponse = await axios.get(`${API_URL}/api/creators/${creatorId}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
-        setCreator(response.data);
+        setCreator(creatorResponse.data);
+
+        // Fetch all creators for sidebar
+        const creatorsResponse = await axios.get(`${API_URL}/api/creators`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setCreators(creatorsResponse.data);
+
+        // Fetch organization
+        const orgResponse = await axios.get(`${API_URL}/api/organizations`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setOrganization(orgResponse.data);
+
+        setExpandedCreator(creatorId);
       } catch (error) {
         toast({
-          title: "Failed to load creator",
+          title: "Failed to load data",
           description: "Redirecting to creators list...",
           variant: "destructive",
         });
@@ -42,229 +79,261 @@ const Dashboard = () => {
       }
     };
 
-    fetchCreator();
+    fetchData();
   }, [creatorId, token, API_URL, navigate, toast]);
+
+  const toggleCreatorExpand = (id) => {
+    setExpandedCreator(expandedCreator === id ? null : id);
+  };
 
   const handleLogout = () => {
     logout();
     navigate('/');
   };
 
-  if (loading) {
+  if (loading || !creator) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading creator dashboard...</p>
+          <p className="text-gray-600">Loading...</p>
         </div>
       </div>
     );
   }
 
-  if (!creator) {
-    return null;
-  }
+  const Sidebar = () => (
+    <div className="flex flex-col h-full bg-white">
+      {/* Organization Header */}
+      <div className="p-6 border-b">
+        <div className="flex items-center space-x-3">
+          {organization?.logo_url ? (
+            <img src={organization.logo_url} alt={organization.name} className="w-10 h-10 rounded-full" />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+              <User className="h-5 w-5 text-gray-600" />
+            </div>
+          )}
+          <div className="flex-1">
+            <p className="font-semibold text-gray-900">{organization?.name || 'Organization'}</p>
+            <ChevronDown className="h-4 w-4 text-gray-500" />
+          </div>
+        </div>
+      </div>
+
+      {/* Main Navigation */}
+      <div className="flex-1 overflow-y-auto">
+        <nav className="p-4 space-y-1">
+          <button
+            onClick={() => { navigate('/creators'); setSidebarOpen(false); }}
+            className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+          >
+            <Home className="h-5 w-5" />
+            <span>Home</span>
+          </button>
+          
+          <button className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+            <Wallet className="h-5 w-5" />
+            <span>Wallet</span>
+          </button>
+          
+          <button className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+            <Users className="h-5 w-5" />
+            <span>Members</span>
+          </button>
+          
+          <button className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition-colors">
+            <LifeBuoy className="h-5 w-5" />
+            <span>Support</span>
+          </button>
+        </nav>
+
+        {/* Creators Section */}
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">Creators</h3>
+            <button
+              onClick={() => { navigate('/create-creator'); setSidebarOpen(false); }}
+              className="p-1 hover:bg-gray-100 rounded transition-colors"
+            >
+              <Plus className="h-4 w-4 text-gray-600" />
+            </button>
+          </div>
+
+          {/* Creator List */}
+          <div className="space-y-1">
+            {creators.map((c) => (
+              <div key={c.id} className="border-l-2 border-gray-200">
+                <button
+                  onClick={() => toggleCreatorExpand(c.id)}
+                  className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center space-x-2">
+                    {c.profile_picture ? (
+                      <img src={c.profile_picture} alt={c.name} className="w-6 h-6 rounded-full" />
+                    ) : (
+                      <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
+                        <User className="h-3 w-3 text-gray-600" />
+                      </div>
+                    )}
+                    <span className="text-sm font-medium text-gray-900">{c.name}</span>
+                  </div>
+                  {expandedCreator === c.id ? (
+                    <ChevronUp className="h-4 w-4 text-gray-500" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                  )}
+                </button>
+
+                {/* Expanded Creator Menu */}
+                {expandedCreator === c.id && (
+                  <div className="ml-6 space-y-0.5 pb-2">
+                    <p className="px-4 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Links</p>
+                    <button className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded transition-colors">
+                      <LinkIcon className="h-4 w-4" />
+                      <span>Links</span>
+                    </button>
+
+                    <p className="px-4 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider mt-2">Creator</p>
+                    <button
+                      onClick={() => { navigate(`/creator/${c.id}/dashboard`); setSidebarOpen(false); }}
+                      className={`w-full flex items-center space-x-2 px-4 py-2 text-sm rounded transition-colors ${
+                        creatorId === c.id ? 'bg-gray-100 text-gray-900 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <LayoutDashboard className="h-4 w-4" />
+                      <span>Dashboard</span>
+                    </button>
+                    <button className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded transition-colors">
+                      <User className="h-4 w-4" />
+                      <span>Profile</span>
+                    </button>
+                    <button className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded transition-colors">
+                      <TrendingUp className="h-4 w-4" />
+                      <span>Analytics</span>
+                    </button>
+                    <button className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded transition-colors">
+                      <ShoppingBag className="h-4 w-4" />
+                      <span>Customers</span>
+                    </button>
+                    <button className="w-full flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded transition-colors">
+                      <CreditCard className="h-4 w-4" />
+                      <span>Transactions</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Actions */}
+      <div className="p-4 border-t space-y-2">
+        <Button
+          onClick={handleLogout}
+          variant="outline"
+          className="w-full justify-start"
+        >
+          Logout
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <Button
-                onClick={() => navigate('/creators')}
-                variant="ghost"
-                size="sm"
-                className="flex items-center space-x-1"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>Back</span>
-              </Button>
-              <h1 className="text-2xl font-bold text-gray-900">VFans Media</h1>
-              <span className="hidden sm:inline text-sm text-gray-500">•</span>
-              <span className="hidden sm:inline text-sm text-gray-500">{creator.name}</span>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right hidden md:block">
-                <p className="text-sm font-medium text-gray-900">{user?.full_name || 'User'}</p>
-                <p className="text-xs text-gray-500">{user?.email}</p>
-              </div>
-              <Button
-                onClick={handleLogout}
-                variant="outline"
-                className="flex items-center space-x-2"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Logout</span>
-              </Button>
-            </div>
+      <header className="bg-white border-b sticky top-0 z-40">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="lg:hidden">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-80">
+                <Sidebar />
+              </SheetContent>
+            </Sheet>
+            
+            <h1 className="text-xl font-bold text-gray-900">VFans Media</h1>
           </div>
+
+          <Button
+            variant="default"
+            className="bg-green-600 hover:bg-green-700 text-white rounded-full px-6"
+          >
+            Create Link
+          </Button>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Creator Header */}
-        <div className="mb-8 flex items-start space-x-6">
-          {creator.profile_picture ? (
-            <img
-              src={creator.profile_picture}
-              alt={creator.name}
-              className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
-            />
-          ) : (
-            <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center border-4 border-white shadow-lg">
-              <User className="h-12 w-12 text-gray-600" />
-            </div>
-          )}
-          <div className="flex-1">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">{creator.name}</h2>
-            {creator.bio && (
-              <p className="text-gray-600 mb-4">{creator.bio}</p>
-            )}
-            <div className="flex items-center space-x-3">
-              <Button
-                onClick={() => navigate(`/creator/${creatorId}/settings`)}
-                variant="outline"
-                size="sm"
-                className="flex items-center space-x-1"
-              >
-                <Settings className="h-4 w-4" />
-                <span>Edit Profile</span>
-              </Button>
-            </div>
-          </div>
+      <main className="max-w-4xl mx-auto p-4 space-y-4">
+        {/* Page Title */}
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-gray-500">Total Earnings</h3>
-              <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                <span className="text-green-600 text-lg">💰</span>
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">$0.00</p>
-            <p className="text-sm text-gray-500 mt-2">Coming soon</p>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-gray-500">Content Posts</h3>
-              <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                <FileText className="h-4 w-4 text-blue-600" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">0</p>
-            <p className="text-sm text-gray-500 mt-2">No content yet</p>
-          </Card>
-
-          <Card className="p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-sm font-medium text-gray-500">Profile Views</h3>
-              <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
-                <User className="h-4 w-4 text-purple-600" />
-              </div>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">0</p>
-            <p className="text-sm text-gray-500 mt-2">Coming soon</p>
-          </Card>
-        </div>
-
-        {/* Quick Actions */}
-        <Card className="p-8">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button className="p-6 border-2 border-gray-200 rounded-lg hover:border-gray-300 transition-colors text-left">
-              <div className="flex items-center space-x-4">
-                <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center">
-                  <FileText className="h-6 w-6 text-gray-600" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900">Upload Content</h4>
-                  <p className="text-sm text-gray-500">Share your latest content</p>
-                </div>
-              </div>
-            </button>
-
-            <button
-              onClick={() => navigate(`/creator/${creatorId}/settings`)}
-              className="p-6 border-2 border-gray-200 rounded-lg hover:border-gray-300 transition-colors text-left"
-            >
-              <div className="flex items-center space-x-4">
-                <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center">
-                  <Settings className="h-6 w-6 text-gray-600" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900">Profile Settings</h4>
-                  <p className="text-sm text-gray-500">Update your information</p>
-                </div>
-              </div>
-            </button>
-
-            <button className="p-6 border-2 border-gray-200 rounded-lg hover:border-gray-300 transition-colors text-left">
-              <div className="flex items-center space-x-4">
-                <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center">
-                  <span className="text-2xl">📊</span>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900">View Analytics</h4>
-                  <p className="text-sm text-gray-500">Track your performance</p>
-                </div>
-              </div>
-            </button>
-
-            <button className="p-6 border-2 border-gray-200 rounded-lg hover:border-gray-300 transition-colors text-left">
-              <div className="flex items-center space-x-4">
-                <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center">
-                  <span className="text-2xl">💸</span>
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900">Payment Settings</h4>
-                  <p className="text-sm text-gray-500">Manage earnings & payouts</p>
-                </div>
-              </div>
-            </button>
+        <Card className="p-6 bg-white rounded-2xl border border-gray-200">
+          <div className="flex items-center space-x-2 mb-4">
+            <DollarSign className="h-5 w-5 text-gray-700" />
+            <h3 className="font-semibold text-gray-700">Total Sales</h3>
           </div>
+          <p className="text-3xl font-bold text-gray-900 mb-2">$0.00 <span className="text-lg text-gray-500">($0.00 gross)</span></p>
+          <p className="text-sm text-gray-600">Available: $0.00 | Pending: $0.00</p>
         </Card>
 
-        {/* Getting Started */}
-        <Card className="p-8 mt-8 bg-gradient-to-br from-gray-50 to-white">
-          <h3 className="text-xl font-bold text-gray-900 mb-4">🚀 Getting Started</h3>
-          <div className="space-y-3">
-            <div className="flex items-start space-x-3">
-              <span className="text-green-500 mt-1">✓</span>
-              <div>
-                <p className="font-medium text-gray-900">Creator profile created</p>
-                <p className="text-sm text-gray-500">{creator.name} is ready to share content</p>
-              </div>
+        <Card className="p-6 bg-white rounded-2xl border border-gray-200">
+          <div className="flex items-center space-x-2 mb-4">
+            <LinkIcon className="h-5 w-5 text-gray-700" />
+            <h3 className="font-semibold text-gray-700">Links sold</h3>
+          </div>
+          <p className="text-3xl font-bold text-gray-900">0 <span className="text-lg text-gray-500">(based on 0 links)</span></p>
+        </Card>
+
+        <Card className="p-6 bg-white rounded-2xl border border-gray-200">
+          <div className="flex items-center space-x-2 mb-4">
+            <Users className="h-5 w-5 text-gray-700" />
+            <h3 className="font-semibold text-gray-700">Customers</h3>
+          </div>
+          <p className="text-3xl font-bold text-gray-900">0</p>
+        </Card>
+
+        {/* Top Links Section */}
+        <Card className="p-6 bg-white rounded-2xl border border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-2">
+              <LinkIcon className="h-5 w-5 text-gray-700" />
+              <h3 className="font-semibold text-gray-700">Top Links</h3>
             </div>
-            <div className="flex items-start space-x-3">
-              <span className="text-gray-300 mt-1">○</span>
-              <div>
-                <p className="font-medium text-gray-900">Upload your first content</p>
-                <p className="text-sm text-gray-500">Share something amazing with your audience</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <span className="text-gray-300 mt-1">○</span>
-              <div>
-                <p className="font-medium text-gray-900">Set up payment method</p>
-                <p className="text-sm text-gray-500">Configure how you want to receive earnings</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <span className="text-gray-300 mt-1">○</span>
-              <div>
-                <p className="font-medium text-gray-900">Share your creator link</p>
-                <p className="text-sm text-gray-500">Start promoting your content to earn money</p>
-              </div>
-            </div>
+          </div>
+          <div className="text-center py-8 text-gray-500">
+            <Package className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+            <p>No links created yet</p>
+            <Button className="mt-4 bg-green-600 hover:bg-green-700 text-white rounded-full">
+              Create Your First Link
+            </Button>
           </div>
         </Card>
       </main>
+
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:block fixed left-0 top-0 h-full w-80 border-r bg-white z-50 overflow-y-auto">
+        <Sidebar />
+      </div>
+
+      {/* Adjust content for desktop sidebar */}
+      <style jsx>{`
+        @media (min-width: 1024px) {
+          main {
+            margin-left: 320px;
+          }
+        }
+      `}</style>
     </div>
   );
 };
