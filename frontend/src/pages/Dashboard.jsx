@@ -1,18 +1,69 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
-import { LogOut, User, Settings, FileText } from 'lucide-react';
+import { LogOut, User, Settings, FileText, ArrowLeft } from 'lucide-react';
+import { useToast } from '../hooks/use-toast';
 
 const Dashboard = () => {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
   const navigate = useNavigate();
+  const { creatorId } = useParams();
+  const { toast } = useToast();
+  const [creator, setCreator] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+
+  useEffect(() => {
+    const fetchCreator = async () => {
+      if (!creatorId) {
+        // No creator ID, redirect to creators list
+        navigate('/creators');
+        return;
+      }
+
+      try {
+        const response = await axios.get(`${API_URL}/api/creators/${creatorId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setCreator(response.data);
+      } catch (error) {
+        toast({
+          title: "Failed to load creator",
+          description: "Redirecting to creators list...",
+          variant: "destructive",
+        });
+        setTimeout(() => navigate('/creators'), 1500);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCreator();
+  }, [creatorId, token, API_URL, navigate, toast]);
 
   const handleLogout = () => {
     logout();
     navigate('/');
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-white to-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading creator dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!creator) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-gray-50">
@@ -21,12 +72,22 @@ const Dashboard = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
+              <Button
+                onClick={() => navigate('/creators')}
+                variant="ghost"
+                size="sm"
+                className="flex items-center space-x-1"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back</span>
+              </Button>
               <h1 className="text-2xl font-bold text-gray-900">VFans Media</h1>
-              <span className="text-sm text-gray-500">Creator Dashboard</span>
+              <span className="hidden sm:inline text-sm text-gray-500">•</span>
+              <span className="hidden sm:inline text-sm text-gray-500">{creator.name}</span>
             </div>
             <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{user?.full_name || 'Creator'}</p>
+              <div className="text-right hidden md:block">
+                <p className="text-sm font-medium text-gray-900">{user?.full_name || 'User'}</p>
                 <p className="text-xs text-gray-500">{user?.email}</p>
               </div>
               <Button
@@ -35,7 +96,7 @@ const Dashboard = () => {
                 className="flex items-center space-x-2"
               >
                 <LogOut className="h-4 w-4" />
-                <span>Logout</span>
+                <span className="hidden sm:inline">Logout</span>
               </Button>
             </div>
           </div>
@@ -44,14 +105,36 @@ const Dashboard = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Welcome Section */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back{user?.full_name ? `, ${user.full_name}` : ''}! 👋
-          </h2>
-          <p className="text-gray-600">
-            Here's what's happening with your creator account today.
-          </p>
+        {/* Creator Header */}
+        <div className="mb-8 flex items-start space-x-6">
+          {creator.profile_picture ? (
+            <img
+              src={creator.profile_picture}
+              alt={creator.name}
+              className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-lg"
+            />
+          ) : (
+            <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center border-4 border-white shadow-lg">
+              <User className="h-12 w-12 text-gray-600" />
+            </div>
+          )}
+          <div className="flex-1">
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">{creator.name}</h2>
+            {creator.bio && (
+              <p className="text-gray-600 mb-4">{creator.bio}</p>
+            )}
+            <div className="flex items-center space-x-3">
+              <Button
+                onClick={() => navigate(`/creator/${creatorId}/settings`)}
+                variant="outline"
+                size="sm"
+                className="flex items-center space-x-1"
+              >
+                <Settings className="h-4 w-4" />
+                <span>Edit Profile</span>
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -106,26 +189,17 @@ const Dashboard = () => {
               </div>
             </button>
 
-            <button className="p-6 border-2 border-gray-200 rounded-lg hover:border-gray-300 transition-colors text-left">
-              <div className="flex items-center space-x-4">
-                <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center">
-                  <User className="h-6 w-6 text-gray-600" />
-                </div>
-                <div>
-                  <h4 className="font-semibold text-gray-900">Edit Profile</h4>
-                  <p className="text-sm text-gray-500">Update your information</p>
-                </div>
-              </div>
-            </button>
-
-            <button className="p-6 border-2 border-gray-200 rounded-lg hover:border-gray-300 transition-colors text-left">
+            <button
+              onClick={() => navigate(`/creator/${creatorId}/settings`)}
+              className="p-6 border-2 border-gray-200 rounded-lg hover:border-gray-300 transition-colors text-left"
+            >
               <div className="flex items-center space-x-4">
                 <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center">
                   <Settings className="h-6 w-6 text-gray-600" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-gray-900">Account Settings</h4>
-                  <p className="text-sm text-gray-500">Manage your account</p>
+                  <h4 className="font-semibold text-gray-900">Profile Settings</h4>
+                  <p className="text-sm text-gray-500">Update your information</p>
                 </div>
               </div>
             </button>
@@ -141,6 +215,18 @@ const Dashboard = () => {
                 </div>
               </div>
             </button>
+
+            <button className="p-6 border-2 border-gray-200 rounded-lg hover:border-gray-300 transition-colors text-left">
+              <div className="flex items-center space-x-4">
+                <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center">
+                  <span className="text-2xl">💸</span>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900">Payment Settings</h4>
+                  <p className="text-sm text-gray-500">Manage earnings & payouts</p>
+                </div>
+              </div>
+            </button>
           </div>
         </Card>
 
@@ -151,15 +237,8 @@ const Dashboard = () => {
             <div className="flex items-start space-x-3">
               <span className="text-green-500 mt-1">✓</span>
               <div>
-                <p className="font-medium text-gray-900">Account created</p>
-                <p className="text-sm text-gray-500">You've successfully created your creator account</p>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <span className="text-gray-300 mt-1">○</span>
-              <div>
-                <p className="font-medium text-gray-900">Complete your profile</p>
-                <p className="text-sm text-gray-500">Add a bio, profile picture, and social links</p>
+                <p className="font-medium text-gray-900">Creator profile created</p>
+                <p className="text-sm text-gray-500">{creator.name} is ready to share content</p>
               </div>
             </div>
             <div className="flex items-start space-x-3">
@@ -172,7 +251,14 @@ const Dashboard = () => {
             <div className="flex items-start space-x-3">
               <span className="text-gray-300 mt-1">○</span>
               <div>
-                <p className="font-medium text-gray-900">Share your link</p>
+                <p className="font-medium text-gray-900">Set up payment method</p>
+                <p className="text-sm text-gray-500">Configure how you want to receive earnings</p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-3">
+              <span className="text-gray-300 mt-1">○</span>
+              <div>
+                <p className="font-medium text-gray-900">Share your creator link</p>
                 <p className="text-sm text-gray-500">Start promoting your content to earn money</p>
               </div>
             </div>

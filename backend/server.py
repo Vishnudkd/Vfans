@@ -97,6 +97,59 @@ class Token(BaseModel):
     token_type: str
     user: UserResponse
 
+# Organization Models
+class Organization(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    name: str
+    logo_url: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class OrganizationCreate(BaseModel):
+    name: str
+    logo_url: Optional[str] = None
+
+class OrganizationResponse(BaseModel):
+    id: str
+    user_id: str
+    name: str
+    logo_url: Optional[str] = None
+    created_at: datetime
+
+# Creator Models
+class Creator(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    organization_id: str
+    name: str
+    profile_picture: Optional[str] = None
+    bio: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class CreatorCreate(BaseModel):
+    organization_id: str
+    name: str
+    profile_picture: Optional[str] = None
+    bio: Optional[str] = None
+
+class CreatorUpdate(BaseModel):
+    name: Optional[str] = None
+    profile_picture: Optional[str] = None
+    bio: Optional[str] = None
+
+class CreatorResponse(BaseModel):
+    id: str
+    user_id: str
+    organization_id: str
+    name: str
+    profile_picture: Optional[str] = None
+    bio: Optional[str] = None
+    created_at: datetime
+
 # Utility Functions
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against a hash"""
@@ -486,6 +539,169 @@ async def resend_verification(email: EmailStr):
     return {
         "status": "success",
         "message": "Verification email sent! Please check your inbox."
+    }
+
+# Organization Routes
+@api_router.post("/organizations", response_model=OrganizationResponse, status_code=status.HTTP_201_CREATED)
+async def create_organization(org_data: OrganizationCreate, current_user: User = Depends(get_current_user)):
+    """Create a new organization"""
+    # Check if user already has an organization
+    existing_org = await db.organizations.find_one({"user_id": current_user.id})
+    if existing_org:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You already have an organization. Each user can only create one organization."
+        )
+    
+    # Create organization
+    organization = Organization(
+        user_id=current_user.id,
+        name=org_data.name,
+        logo_url=org_data.logo_url
+    )
+    
+    # Convert to dict and serialize datetime
+    org_doc = organization.model_dump()
+    org_doc['created_at'] = org_doc['created_at'].isoformat()
+    
+    # Insert into database
+    await db.organizations.insert_one(org_doc)
+    
+    return OrganizationResponse(**organization.model_dump())
+
+@api_router.get("/organizations", response_model=OrganizationResponse)
+async def get_organization(current_user: User = Depends(get_current_user)):
+    """Get user's organization"""
+    org_doc = await db.organizations.find_one({"user_id": current_user.id}, {"_id": 0})
+    
+    if not org_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No organization found. Please create one first."
+        )
+    
+    # Convert ISO string timestamps back to datetime
+    if isinstance(org_doc.get('created_at'), str):
+        org_doc['created_at'] = datetime.fromisoformat(org_doc['created_at'])
+    
+    return OrganizationResponse(**org_doc)
+
+# Creator Routes
+@api_router.post("/creators", response_model=CreatorResponse, status_code=status.HTTP_201_CREATED)
+async def create_creator(creator_data: CreatorCreate, current_user: User = Depends(get_current_user)):
+    """Create a new creator profile"""
+    # Verify organization exists and belongs to user
+    org_doc = await db.organizations.find_one({
+        "id": creator_data.organization_id,
+        "user_id": current_user.id
+    })
+    
+    if not org_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Organization not found or doesn't belong to you"
+        )
+    
+    # Create creator
+    creator = Creator(
+        user_id=current_user.id,
+        organization_id=creator_data.organization_id,
+        name=creator_data.name,
+        profile_picture=creator_data.profile_picture,
+        bio=creator_data.bio
+    )
+    
+    # Convert to dict and serialize datetime
+    creator_doc = creator.model_dump()
+    creator_doc['created_at'] = creator_doc['created_at'].isoformat()
+    
+    # Insert into database
+    await db.creators.insert_one(creator_doc)
+    
+    return CreatorResponse(**creator.model_dump())
+
+@api_router.get("/creators", response_model=List[CreatorResponse])
+async def get_creators(current_user: User = Depends(get_current_user)):
+    """Get all creator profiles for current user"""
+    creators = await db.creators.find({"user_id": current_user.id}, {"_id": 0}).to_list(1000)
+    
+    # Convert ISO string timestamps back to datetime
+    for creator in creators:
+        if isinstance(creator.get('created_at'), str):
+            creator['created_at'] = datetime.fromisoformat(creator['created_at'])
+    
+    return [CreatorResponse(**creator) for creator in creators]
+
+@api_router.get("/creators/{creator_id}", response_model=CreatorResponse)
+async def get_creator(creator_id: str, current_user: User = Depends(get_current_user)):
+    """Get specific creator profile"""
+    creator_doc = await db.creators.find_one({
+        "id": creator_id,
+        "user_id": current_user.id
+    }, {"_id": 0})
+    
+    if not creator_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Creator not found"
+        )
+    
+    # Convert ISO string timestamps back to datetime
+    if isinstance(creator_doc.get('created_at'), str):
+        creator_doc['created_at'] = datetime.fromisoformat(creator_doc['created_at'])
+    
+    return CreatorResponse(**creator_doc)
+
+@api_router.put("/creators/{creator_id}", response_model=CreatorResponse)
+async def update_creator(creator_id: str, creator_data: CreatorUpdate, current_user: User = Depends(get_current_user)):
+    """Update creator profile"""
+    # Verify creator exists and belongs to user
+    creator_doc = await db.creators.find_one({
+        "id": creator_id,
+        "user_id": current_user.id
+    }, {"_id": 0})
+    
+    if not creator_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Creator not found"
+        )
+    
+    # Update only provided fields
+    update_data = {k: v for k, v in creator_data.model_dump().items() if v is not None}
+    
+    if update_data:
+        await db.creators.update_one(
+            {"id": creator_id},
+            {"$set": update_data}
+        )
+    
+    # Get updated creator
+    updated_creator = await db.creators.find_one({"id": creator_id}, {"_id": 0})
+    
+    # Convert ISO string timestamps back to datetime
+    if isinstance(updated_creator.get('created_at'), str):
+        updated_creator['created_at'] = datetime.fromisoformat(updated_creator['created_at'])
+    
+    return CreatorResponse(**updated_creator)
+
+@api_router.delete("/creators/{creator_id}")
+async def delete_creator(creator_id: str, current_user: User = Depends(get_current_user)):
+    """Delete creator profile"""
+    result = await db.creators.delete_one({
+        "id": creator_id,
+        "user_id": current_user.id
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Creator not found"
+        )
+    
+    return {
+        "status": "success",
+        "message": "Creator profile deleted successfully"
     }
 
 # Include the router in the main app

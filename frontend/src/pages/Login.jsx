@@ -109,12 +109,12 @@ const Login = () => {
       if (result.success) {
         toast({
           title: "Login Successful!",
-          description: "Welcome back to VFans Media. Redirecting to your dashboard...",
+          description: "Welcome back to VFans Media. Redirecting...",
         });
         
-        // Redirect to dashboard after successful login
+        // Redirect to creators list after successful login
         setTimeout(() => {
-          navigate('/dashboard');
+          navigate('/creators');
         }, 1000);
       } else {
         // Check if error is about email verification

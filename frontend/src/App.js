@@ -11,6 +11,9 @@ import Signup from "./pages/Signup";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import VerifyEmail from "./pages/VerifyEmail";
+import CreateOrganization from "./pages/CreateOrganization";
+import CreateCreator from "./pages/CreateCreator";
+import CreatorsList from "./pages/CreatorsList";
 import PricingPage from "./pages/PricingPage";
 import Contact from "./pages/Contact";
 import Support from "./pages/Support";
@@ -34,6 +37,8 @@ function App() {
             <Route path="/signup" element={<Signup />} />
             <Route path="/login" element={<Login />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
+            
+            {/* Protected Routes */}
             <Route 
               path="/dashboard" 
               element={
@@ -42,6 +47,40 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+            <Route 
+              path="/create-organization" 
+              element={
+                <ProtectedRoute>
+                  <CreateOrganization />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/create-creator" 
+              element={
+                <ProtectedRoute>
+                  <CreateCreator />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/creators" 
+              element={
+                <ProtectedRoute>
+                  <CreatorsList />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/creator/:creatorId/dashboard" 
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              } 
+            />
+
+            {/* Public Pages */}
             <Route path="/pricing" element={<PricingPage />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/support" element={<Support />} />
