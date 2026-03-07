@@ -10,6 +10,7 @@ import Home from "./pages/Home";
 import Signup from "./pages/Signup";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import VerifyEmail from "./pages/VerifyEmail";
 import PricingPage from "./pages/PricingPage";
 import Contact from "./pages/Contact";
 import Support from "./pages/Support";
@@ -32,6 +33,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/verify-email" element={<VerifyEmail />} />
             <Route 
               path="/dashboard" 
               element={

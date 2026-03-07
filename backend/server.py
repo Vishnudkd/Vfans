@@ -12,6 +12,9 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from passlib.context import CryptContext
 import jwt
+import asyncio
+import resend
+import secrets
 
 
 ROOT_DIR = Path(__file__).parent
@@ -26,6 +29,14 @@ db = client[os.environ['DB_NAME']]
 SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production-vfans-media-2024')
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+
+# Email Configuration
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
+SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'noreply@vfansmedia.com')
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+
+# Initialize Resend
+resend.api_key = RESEND_API_KEY
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -60,6 +71,8 @@ class User(BaseModel):
     hashed_password: str
     full_name: Optional[str] = None
     is_active: bool = True
+    email_verified: bool = False
+    verification_token: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class UserCreate(BaseModel):
@@ -76,6 +89,7 @@ class UserResponse(BaseModel):
     email: str
     full_name: Optional[str] = None
     is_active: bool
+    email_verified: bool
     created_at: datetime
 
 class Token(BaseModel):
@@ -91,6 +105,109 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def get_password_hash(password: str) -> str:
     """Hash a password"""
     return pwd_context.hash(password)
+
+def generate_verification_token() -> str:
+    """Generate a secure random verification token"""
+    return secrets.token_urlsafe(32)
+
+async def send_verification_email(email: str, token: str, full_name: Optional[str] = None):
+    """Send verification email using Resend"""
+    verification_url = f"{FRONTEND_URL}/verify-email?token={token}"
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; padding: 20px;">
+            <tr>
+                <td align="center">
+                    <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <!-- Header -->
+                        <tr>
+                            <td style="background-color: #000000; padding: 30px; text-align: center;">
+                                <h1 style="color: #ffffff; margin: 0; font-size: 28px;">VFans Media</h1>
+                            </td>
+                        </tr>
+                        
+                        <!-- Content -->
+                        <tr>
+                            <td style="padding: 40px 30px;">
+                                <h2 style="color: #333333; margin: 0 0 20px 0; font-size: 24px;">
+                                    Verify Your Email Address
+                                </h2>
+                                <p style="color: #666666; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                                    Hi{' ' + full_name if full_name else ''},
+                                </p>
+                                <p style="color: #666666; font-size: 16px; line-height: 1.6; margin: 0 0 20px 0;">
+                                    Thank you for signing up with VFans Media! To complete your registration and start sharing your content, please verify your email address by clicking the button below:
+                                </p>
+                                
+                                <!-- Button -->
+                                <table width="100%" cellpadding="0" cellspacing="0" style="margin: 30px 0;">
+                                    <tr>
+                                        <td align="center">
+                                            <a href="{verification_url}" style="display: inline-block; background-color: #000000; color: #ffffff; text-decoration: none; padding: 15px 40px; border-radius: 50px; font-size: 16px; font-weight: bold;">
+                                                Verify Email Address
+                                            </a>
+                                        </td>
+                                    </tr>
+                                </table>
+                                
+                                <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 20px 0 0 0;">
+                                    Or copy and paste this link into your browser:
+                                </p>
+                                <p style="color: #0066cc; font-size: 14px; line-height: 1.6; margin: 10px 0 0 0; word-break: break-all;">
+                                    {verification_url}
+                                </p>
+                                
+                                <p style="color: #999999; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0;">
+                                    This link will expire in 24 hours for security reasons.
+                                </p>
+                                <p style="color: #999999; font-size: 14px; line-height: 1.6; margin: 10px 0 0 0;">
+                                    If you didn't create an account with VFans Media, please ignore this email.
+                                </p>
+                            </td>
+                        </tr>
+                        
+                        <!-- Footer -->
+                        <tr>
+                            <td style="background-color: #f8f8f8; padding: 20px 30px; text-align: center; border-top: 1px solid #eeeeee;">
+                                <p style="color: #999999; font-size: 12px; line-height: 1.6; margin: 0;">
+                                    © 2024 VFans Media LLC. All rights reserved.
+                                </p>
+                                <p style="color: #999999; font-size: 12px; line-height: 1.6; margin: 10px 0 0 0;">
+                                    <a href="{FRONTEND_URL}/privacy-policy" style="color: #666666; text-decoration: none;">Privacy Policy</a> | 
+                                    <a href="{FRONTEND_URL}/terms-of-service" style="color: #666666; text-decoration: none;">Terms of Service</a>
+                                </p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        </table>
+    </body>
+    </html>
+    """
+    
+    params = {
+        "from": SENDER_EMAIL,
+        "to": [email],
+        "subject": "Verify Your Email - VFans Media",
+        "html": html_content
+    }
+    
+    try:
+        # Run sync SDK in thread to keep FastAPI non-blocking
+        email_response = await asyncio.to_thread(resend.Emails.send, params)
+        logger.info(f"Verification email sent to {email}, ID: {email_response.get('id')}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send verification email to {email}: {str(e)}")
+        return False
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create JWT access token"""
@@ -175,7 +292,7 @@ async def get_status_checks():
 # Authentication Routes
 @api_router.post("/signup", response_model=Token, status_code=status.HTTP_201_CREATED)
 async def signup(user_data: UserCreate):
-    """Register a new user"""
+    """Register a new user and send verification email"""
     # Check if user already exists
     existing_user = await db.users.find_one({"email": user_data.email})
     if existing_user:
@@ -184,11 +301,16 @@ async def signup(user_data: UserCreate):
             detail="Email already registered"
         )
     
+    # Generate verification token
+    verification_token = generate_verification_token()
+    
     # Create new user
     user = User(
         email=user_data.email,
         hashed_password=get_password_hash(user_data.password),
-        full_name=user_data.full_name
+        full_name=user_data.full_name,
+        email_verified=False,
+        verification_token=verification_token
     )
     
     # Convert to dict and serialize datetime to ISO string for MongoDB
@@ -197,6 +319,9 @@ async def signup(user_data: UserCreate):
     
     # Insert user into database
     await db.users.insert_one(user_doc)
+    
+    # Send verification email (non-blocking)
+    await send_verification_email(user.email, verification_token, user.full_name)
     
     # Create access token
     access_token = create_access_token(data={"sub": user.id})
@@ -207,6 +332,7 @@ async def signup(user_data: UserCreate):
         email=user.email,
         full_name=user.full_name,
         is_active=user.is_active,
+        email_verified=user.email_verified,
         created_at=user.created_at
     )
     
@@ -218,7 +344,7 @@ async def signup(user_data: UserCreate):
 
 @api_router.post("/login", response_model=Token)
 async def login(user_credentials: UserLogin):
-    """Login user and return JWT token"""
+    """Login user and return JWT token - requires email verification"""
     # Find user by email
     user_doc = await db.users.find_one({"email": user_credentials.email}, {"_id": 0})
     
@@ -248,6 +374,13 @@ async def login(user_credentials: UserLogin):
             detail="Inactive user"
         )
     
+    # Check if email is verified
+    if not user.email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email address before logging in. Check your inbox for the verification link."
+        )
+    
     # Create access token
     access_token = create_access_token(data={"sub": user.id})
     
@@ -257,6 +390,7 @@ async def login(user_credentials: UserLogin):
         email=user.email,
         full_name=user.full_name,
         is_active=user.is_active,
+        email_verified=user.email_verified,
         created_at=user.created_at
     )
     
@@ -274,8 +408,85 @@ async def get_me(current_user: User = Depends(get_current_user)):
         email=current_user.email,
         full_name=current_user.full_name,
         is_active=current_user.is_active,
+        email_verified=current_user.email_verified,
         created_at=current_user.created_at
     )
+
+@api_router.get("/verify-email/{token}")
+async def verify_email(token: str):
+    """Verify user email with token"""
+    # Find user with this verification token
+    user_doc = await db.users.find_one({"verification_token": token}, {"_id": 0})
+    
+    if not user_doc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification link"
+        )
+    
+    # Update user to mark email as verified
+    await db.users.update_one(
+        {"verification_token": token},
+        {
+            "$set": {
+                "email_verified": True,
+                "verification_token": None
+            }
+        }
+    )
+    
+    return {
+        "status": "success",
+        "message": "Email verified successfully! You can now log in to your account."
+    }
+
+@api_router.post("/resend-verification")
+async def resend_verification(email: EmailStr):
+    """Resend verification email"""
+    # Find user by email
+    user_doc = await db.users.find_one({"email": email}, {"_id": 0})
+    
+    if not user_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    
+    # Convert ISO string timestamps back to datetime objects
+    if isinstance(user_doc.get('created_at'), str):
+        user_doc['created_at'] = datetime.fromisoformat(user_doc['created_at'])
+    
+    user = User(**user_doc)
+    
+    # Check if already verified
+    if user.email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email is already verified"
+        )
+    
+    # Generate new verification token
+    new_token = generate_verification_token()
+    
+    # Update user with new token
+    await db.users.update_one(
+        {"email": email},
+        {"$set": {"verification_token": new_token}}
+    )
+    
+    # Send verification email
+    email_sent = await send_verification_email(user.email, new_token, user.full_name)
+    
+    if not email_sent:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send verification email"
+        )
+    
+    return {
+        "status": "success",
+        "message": "Verification email sent! Please check your inbox."
+    }
 
 # Include the router in the main app
 app.include_router(api_router)

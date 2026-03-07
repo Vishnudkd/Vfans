@@ -86,14 +86,15 @@ const Signup = () => {
       
       if (result.success) {
         toast({
-          title: "Account Created Successfully!",
-          description: "Welcome to VFans Media. Redirecting to your dashboard...",
+          title: "Account Created Successfully! 🎉",
+          description: "Please check your email to verify your account before logging in.",
+          duration: 6000,
         });
         
-        // Redirect to dashboard after successful signup
+        // Redirect to a success page or login after showing the message
         setTimeout(() => {
-          navigate('/dashboard');
-        }, 1000);
+          navigate('/login');
+        }, 2000);
       } else {
         toast({
           title: "Signup Failed",

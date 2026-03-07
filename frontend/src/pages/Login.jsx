@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Mail } from 'lucide-react';
 import { useToast } from '../hooks/use-toast';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -15,12 +16,16 @@ const Login = () => {
   const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showResendButton, setShowResendButton] = useState(false);
+  const [resendingEmail, setResendingEmail] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   });
 
   const [errors, setErrors] = useState({});
+
+  const API_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -32,6 +37,8 @@ const Login = () => {
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
+    // Hide resend button when user types
+    setShowResendButton(false);
   };
 
   const validateForm = () => {
@@ -53,6 +60,39 @@ const Login = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleResendVerification = async () => {
+    if (!formData.email) {
+      toast({
+        title: "Email Required",
+        description: "Please enter your email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setResendingEmail(true);
+
+    try {
+      await axios.post(`${API_URL}/api/resend-verification`, formData.email, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      toast({
+        title: "Verification Email Sent! 📧",
+        description: "Please check your inbox for the verification link.",
+      });
+      setShowResendButton(false);
+    } catch (error) {
+      toast({
+        title: "Failed to Send Email",
+        description: error.response?.data?.detail || "Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setResendingEmail(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -61,6 +101,7 @@ const Login = () => {
     }
 
     setIsSubmitting(true);
+    setShowResendButton(false);
 
     try {
       const result = await login(formData.email, formData.password);
@@ -76,10 +117,16 @@ const Login = () => {
           navigate('/dashboard');
         }, 1000);
       } else {
+        // Check if error is about email verification
+        if (result.error && result.error.includes('verify your email')) {
+          setShowResendButton(true);
+        }
+        
         toast({
           title: "Login Failed",
           description: result.error,
           variant: "destructive",
+          duration: 6000,
         });
         setIsSubmitting(false);
       }
@@ -175,6 +222,20 @@ const Login = () => {
               >
                 {isSubmitting ? 'Signing in...' : 'Sign In'}
               </Button>
+
+              {/* Resend Verification Button */}
+              {showResendButton && (
+                <Button
+                  type="button"
+                  onClick={handleResendVerification}
+                  disabled={resendingEmail}
+                  variant="outline"
+                  className="w-full mt-3 py-6 text-lg rounded-full border-2 border-blue-500 text-blue-600 hover:bg-blue-50"
+                >
+                  <Mail className="h-5 w-5 mr-2" />
+                  {resendingEmail ? 'Sending...' : 'Resend Verification Email'}
+                </Button>
+              )}
             </form>
 
             <div className="mt-6 text-center">
