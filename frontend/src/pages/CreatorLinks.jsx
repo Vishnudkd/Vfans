@@ -139,7 +139,9 @@ const CreatorLinks = () => {
             <option value="oldest">Oldest</option>
             <option value="popular">Most Popular</option>
           </select>
-          <Button className="bg-green-600 hover:bg-green-700 text-white rounded-full px-6">
+          <Button className="bg-green-600 hover:bg-green-700 text-white rounded-full px-6"
+            onClick={() => navigate(`/creator/${creatorId}/links/create`)}
+          >
             Create
           </Button>
         </div>
@@ -154,7 +156,9 @@ const CreatorLinks = () => {
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
               You don't have any active links. Create a new one or reactivate an existing link.
             </p>
-            <Button className="bg-green-600 hover:bg-green-700 text-white rounded-full px-8">
+            <Button className="bg-green-600 hover:bg-green-700 text-white rounded-full px-8"
+              onClick={() => navigate(`/creator/${creatorId}/links/create`)}
+            >
               Create link
             </Button>
           </div>

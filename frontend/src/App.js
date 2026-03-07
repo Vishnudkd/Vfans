@@ -19,6 +19,7 @@ import CreatorAnalytics from "./pages/CreatorAnalytics";
 import CreatorCustomers from "./pages/CreatorCustomers";
 import CreatorTransactions from "./pages/CreatorTransactions";
 import Wallet from "./pages/Wallet";
+import CreateLink from "./pages/CreateLink";
 import PricingPage from "./pages/PricingPage";
 import Contact from "./pages/Contact";
 import Support from "./pages/Support";
@@ -113,6 +114,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <Wallet />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/creator/:creatorId/links/create" 
+              element={
+                <ProtectedRoute>
+                  <CreateLink />
                 </ProtectedRoute>
               } 
             />
